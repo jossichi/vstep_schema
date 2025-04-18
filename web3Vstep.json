@@ -1,0 +1,3384 @@
+[
+  {
+    "_id": "collection_cards",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "CardData",
+          "type": "object",
+          "properties": {
+            "_id": { "type": "string" },
+            "card_id": {
+              "type": "string",
+              "unique": true,
+              "description": "Mã định danh duy nhất của thẻ"
+            },
+            "user_id": {
+              "type": "string",
+              "unique": true,
+              "description": "ID người dùng sở hữu thẻ"
+            },
+            "public_key": {
+              "type": "string",
+              "description": "Khóa công khai để xác thực chữ ký số"
+            },
+            "token": { "type": "String", "required": true },
+            "qr_code": {
+              "type": "string",
+              "description": "Mã QR chứa thông tin xác thực (đã mã hóa)"
+            },
+            "signature": {
+              "type": "string",
+              "description": "Chữ ký số được tạo bởi ví của người dùng"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["active", "inactive", "blocked"],
+              "description": "Trạng thái thẻ"
+            },
+            "device_id": {
+              "type": "string",
+              "description": "ID của thiết bị sử dụng thẻ (nếu có).",
+              "nullable": true
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời gian tạo thẻ"
+            },
+            "hashed_studentID": {
+              "type": "string",
+              "unique": true,
+              "description": "Giá trị băm của studentID"
+            }
+          },
+          "required": [
+            "_id",
+            "card_id",
+            "user_id",
+            "public_key",
+            "qr_code",
+            "token",
+            "status",
+            "created_at",
+            "hashed_studentID"
+          ]
+        },
+        "jsonSample": [
+          {
+            "_id": "CARD001",
+            "card_id": "C123456789",
+            "user_id": "USER123",
+            "public_key": "-BEGIN PUBLIC KEY-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...",
+            "qr_code": "https://example.com/cards/C123456789",
+            "signature": "MEUCIQDZsVvXl9z2...c3RvbSBzaWduYXR1cmU=",
+            "status": "active",
+            "device_id": "DEVICE123",
+            "created_at": "2025-02-14T18:26:02.588Z",
+            "hashed_studentID": "a1b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890"
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$addFields": {
+                  "key_pair": {
+                    "$function": {
+                      "body": "function() { const crypto = require('crypto'); const { publicKey, privateKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'secp256k1', publicKeyEncoding: { type: 'spki', format: 'pem' }, privateKeyEncoding: { type: 'pkcs8', format: 'pem' } }); return { publicKey, privateKey }; }",
+                      "args": [],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "public_key": "$key_pair.publicKey",
+                  "private_key": "$key_pair.privateKey"
+                }
+              },
+              {
+                "$addFields": {
+                  "raw_qr_data": {
+                    "user_id": "$user_id",
+                    "card_id": "$card_id"
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "encrypted_qr_data": {
+                    "$function": {
+                      "body": "function(data, secretKey) { const crypto = require('crypto'); const cipher = crypto.createCipher('aes-256-cbc', secretKey); let encrypted = cipher.update(JSON.stringify(data), 'utf8', 'hex'); encrypted += cipher.final('hex'); return encrypted; }",
+                      "args": ["$raw_qr_data", "your-secret-key"],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "qr_code": {
+                    "$concat": ["https://example.com/cards/", "$card_id"]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "signature": {
+                    "$function": {
+                      "body": "function(privateKey, qr_data) { const crypto = require('crypto'); const sign = crypto.createSign('SHA256'); sign.update(qr_data); sign.end(); return sign.sign(privateKey, 'base64'); }",
+                      "args": ["$private_key", "$encrypted_qr_data"],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "hashed_studentID": {
+                    "$function": {
+                      "body": "function(studentID) { const crypto = require('crypto'); return crypto.createHash('sha256').update(studentID).digest('hex'); }",
+                      "args": ["$studentID"],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+              {
+                "$unset": [
+                  "key_pair",
+                  "private_key",
+                  "studentID",
+                  "raw_qr_data"
+                ]
+              },
+              {
+                "$merge": {
+                  "into": "collection_cards",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Create physical wallet and hash studentID without storing the original studentID.",
+            "data_input_from_node": [],
+            "data_output_to_node": []
+          }
+        ]
+      }
+    }
+  },
+
+  {
+    "_id": "collection_user_login",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "UserData",
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "description": "The unique identifier of the document in MongoDB."
+            },
+            "user_id": {
+              "type": "string",
+              "unique": true,
+              "description": "ID người dùng sở hữu thẻ"
+            },
+            "card_id": {
+              "type": "string",
+              "description": "Mã định danh của thẻ vật lý (nếu có).",
+              "nullable": true
+            },
+            "token_login": {
+              "type": "object",
+              "properties": {
+                "expires_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Thời gian hết hạn của token"
+                }
+              }
+            },
+
+            "signature": {
+              "type": "string",
+              "description": "Chữ ký số được tạo bởi ví của người dùng"
+            }
+          },
+          "required": ["_id", "card_id", "signature", "token_login"],
+          "additionalProperties": false
+        },
+        "jsonSample": [
+          {
+            "_id": "USER001",
+            "user_id": "102fd0c3-ed5b-44f6-86da-896b250ddcc9",
+            "signature": "MEUCIQDZsVvXl9z2...c3RvbSBzaWduYXR1cmU=",
+            "card_id": "C123456789"
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true, "$type": "string" },
+                  "signature": { "$exists": true, "$type": "string" },
+                  "card_id": {
+                    "$exists": true,
+                    "$type": "string"
+                  }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$match": {
+                  "card_data": { "$ne": [] },
+                  "card_data.status": "active"
+                }
+              },
+              {
+                "$addFields": {
+                  "public_key": {
+                    "$arrayElemAt": ["$card_data.public_key", 0]
+                  },
+                  "user_id": { "$arrayElemAt": ["$card_data.user_id", 0] },
+                  "card_id": { "$arrayElemAt": ["$card_data.card_id", 0] }
+                }
+              },
+              {
+                "$addFields": {
+                  "token_login": {
+                    "token": { "$toString": { "$uuid": {} } },
+                    "expires_at": {
+                      "$dateAdd": {
+                        "startDate": "$$NOW",
+                        "unit": "hour",
+                        "amount": 24
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "is_signature_valid": {
+                    "$function": {
+                      "body": "function(signature, public_key, qr_code) { const crypto = require('crypto'); const verify = crypto.createVerify('SHA256'); verify.update(qr_code); return verify.verify(public_key, signature, 'base64'); }",
+                      "args": ["$signature", "$public_key", "$qr_code"],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+              {
+                "$set": {
+                  "scan_attempts": { "$add": ["$scan_attempts", 1] }
+                }
+              },
+              {
+                "$match": {
+                  "is_signature_valid": true
+                }
+              },
+
+              {
+                "$set": {
+                  "token": { "$toString": { "$uuid": {} } },
+                  "created_at": {
+                    "$dateToString": {
+                      "format": "%Y-%m-%dT%H:%M:%S",
+                      "date": "$$NOW"
+                    }
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_login",
+                  "on": "user_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Tạo token, quản lý user, và ghi log đăng nhập vào collection_user_all",
+            "data_input_from_node": ["collection_user_login"],
+            "data_output_to_node": "collection_user_all"
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Your Name",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+
+  {
+    "_id": "collection_tests",
+    "public": {
+      "node_data": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "UnifiedTestSchema",
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "test_id": { "type": "string" },
+          "test_type": { "type": "string", "enum": ["listening", "reading"] },
+          "level": {
+            "type": "string",
+            "enum": ["B1", "B2", "C1"]
+          }
+        },
+        "required": ["_id", "test_id", "test_type"],
+        "allOf": [
+          {
+            "if": { "properties": { "test_type": { "const": "listening" } } },
+            "then": {
+              "properties": {
+                "audio_file": {
+                  "type": "string",
+                  "contentEncoding": "base64",
+                  "description": "Base64-encoded audio file uploaded by the user."
+                },
+                "questions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "question_id": { "type": "string" },
+                      "question_text": { "type": "string" },
+                      "options": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "minItems": 4,
+                        "maxItems": 4
+                      },
+                      "correct_answer": { "type": "string" }
+                    },
+                    "required": [
+                      "question_id",
+                      "question_text",
+                      "options",
+                      "correct_answer"
+                    ]
+                  }
+                }
+              },
+              "required": ["audio_file", "questions"]
+            }
+          },
+          {
+            "if": { "properties": { "test_type": { "const": "reading" } } },
+            "then": {
+              "properties": {
+                "instructions": { "type": "string" },
+                "passages": {
+                  "type": "array",
+                  "minItems": 4,
+                  "maxItems": 4,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "passage_id": { "type": "string" },
+                      "question_text": { "type": "string" },
+                      "questions": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "question_id": { "type": "string" },
+                            "question_type": {
+                              "type": "string",
+                              "enum": ["multiple_choice", "short_answer"]
+                            },
+                            "text": { "type": "string" },
+                            "options": {
+                              "type": "array",
+                              "items": { "type": "string" },
+                              "minItems": 4,
+                              "maxItems": 4
+                            },
+                            "correct_answer": { "type": "string" }
+                          },
+                          "required": [
+                            "question_id",
+                            "question_type",
+                            "text",
+                            "correct_answer"
+                          ],
+                          "allOf": [
+                            {
+                              "if": {
+                                "properties": {
+                                  "question_type": {
+                                    "const": "multiple_choice"
+                                  }
+                                }
+                              },
+                              "then": {
+                                "required": ["options", "correct_answer"]
+                              }
+                            },
+                            {
+                              "if": {
+                                "properties": {
+                                  "question_type": { "const": "short_answer" }
+                                }
+                              },
+                              "then": { "required": ["correct_answer"] }
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "required": ["passage_id", "question_text", "questions"]
+                  }
+                }
+              },
+              "required": ["level", "instructions", "passages"]
+            }
+          }
+        ],
+        "additionalProperties": false
+      }
+    },
+
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Your Name",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+
+  {
+    "_id": "collection_user_tests",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "UserTestSchema",
+          "type": "object",
+          "properties": {
+            "_id": { "type": "string" },
+            "user_id": { "type": "string" },
+            "test_id": { "type": "string" },
+            "test_type": { "type": "string", "enum": ["listening", "reading"] },
+            "submission_time": { "type": "string", "format": "date-time" },
+            "user_answers": {
+              "type": "object",
+              "properties": {
+                "listening": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "question_id": { "type": "string" },
+                      "user_answer": { "type": "string" },
+                      "is_correct": { "type": "boolean" },
+                      "correct_answer": { "type": "string" }
+                    },
+                    "required": [
+                      "question_id",
+                      "user_answer",
+                      "is_correct",
+                      "correct_answer"
+                    ]
+                  },
+                  "default": []
+                },
+                "reading": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "question_id": { "type": "string" },
+                      "user_answer": { "type": "string" },
+                      "is_correct": { "type": "boolean" },
+                      "correct_answer": { "type": "string" }
+                    },
+                    "required": [
+                      "question_id",
+                      "user_answer",
+                      "is_correct",
+                      "correct_answer"
+                    ]
+                  },
+                  "default": []
+                }
+              },
+              "required": []
+            },
+            "token": {
+              "type": "string",
+              "description": "Token xác thực của người dùng."
+            },
+            "total_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "avg_score": { "type": "number", "minimum": 0, "maximum": 100 },
+            "new_level": {
+              "type": "string",
+              "enum": ["B1", "B2", "C1", "C2"]
+            },
+            "is_eligible_for_mentorship": { "type": "boolean" },
+            "is_completed": { "type": "boolean" },
+
+            "post_test_actions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["practice", "upload_test"]
+              }
+            }
+          },
+          "required": [
+            "_id",
+            "user_id",
+            "test_id",
+            "test_type",
+            "submission_time",
+            "user_answers",
+            "total_score",
+            "new_level",
+            "is_eligible_for_mentorship",
+            "token",
+            "is_completed",
+            "post_test_actions"
+          ]
+        },
+        "jsonSample": [
+          {
+            "_id": "TEST001",
+            "user_id": "USER123",
+            "test_id": "LISTEN001",
+            "test_type": "listening",
+            "submission_time": "2025-02-15T10:00:00.000Z",
+            "user_answers": {
+              "listening": [
+                {
+                  "question_id": "L001",
+                  "user_answer": "A",
+                  "is_correct": true,
+                  "correct_answer": "A"
+                },
+                {
+                  "question_id": "L002",
+                  "user_answer": "B",
+                  "is_correct": false,
+                  "correct_answer": "C"
+                }
+              ],
+              "reading": []
+            },
+            "token": "abc123xyz",
+            "total_score": 50,
+            "avg_score": 50,
+            "new_level": "B1",
+            "is_eligible_for_mentorship": false,
+            "is_completed": true,
+            "post_test_actions": ["practice"]
+          },
+          {
+            "_id": "TEST002",
+            "user_id": "USER123",
+            "test_id": "READ001",
+            "test_type": "reading",
+            "submission_time": "2025-02-15T11:00:00.000Z",
+            "user_answers": {
+              "listening": [],
+              "reading": [
+                {
+                  "question_id": "R001",
+                  "user_answer": "True",
+                  "is_correct": true,
+                  "correct_answer": "True"
+                },
+                {
+                  "question_id": "R002",
+                  "user_answer": "False",
+                  "is_correct": true,
+                  "correct_answer": "False"
+                }
+              ]
+            },
+            "token": "def456uvw",
+            "total_score": 80,
+            "avg_score": 80,
+            "new_level": "B2",
+            "is_eligible_for_mentorship": true,
+            "is_completed": true,
+            "post_test_actions": ["upload_test"]
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true, "$type": "string" },
+                  "test_id": { "$exists": true, "$type": "string" }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_tests",
+                  "localField": "test_id",
+                  "foreignField": "test_id",
+                  "as": "test_data"
+                }
+              },
+              {
+                "$unwind": "$test_data"
+              },
+              {
+                "$addFields": {
+                  "listening_scores": {
+                    "$map": {
+                      "input": "$user_answers.listening",
+                      "as": "ans",
+                      "in": {
+                        "question_id": "$$ans.question_id",
+                        "user_answer": "$$ans.user_answer",
+                        "is_correct": {
+                          "$eq": [
+                            "$$ans.user_answer",
+                            {
+                              "$arrayElemAt": [
+                                "$test_data.listening.questions.correct_answer",
+                                {
+                                  "$indexOfArray": [
+                                    "$test_data.listening.questions.question_id",
+                                    "$$ans.question_id"
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "reading_scores": {
+                    "$map": {
+                      "input": "$user_answers.reading",
+                      "as": "ans",
+                      "in": {
+                        "question_id": "$$ans.question_id",
+                        "user_answer": "$$ans.user_answer",
+                        "is_correct": {
+                          "$eq": [
+                            "$$ans.user_answer",
+                            {
+                              "$arrayElemAt": [
+                                "$test_data.reading.questions.correct_answer",
+                                {
+                                  "$indexOfArray": [
+                                    "$test_data.reading.questions.question_id",
+                                    "$$ans.question_id"
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "total_correct_listening": {
+                    "$sum": {
+                      "$map": {
+                        "input": "$listening_scores",
+                        "as": "q",
+                        "in": {
+                          "$cond": {
+                            "if": "$$q.is_correct",
+                            "then": 1,
+                            "else": 0
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "total_correct_reading": {
+                    "$sum": {
+                      "$map": {
+                        "input": "$reading_scores",
+                        "as": "q",
+                        "in": {
+                          "$cond": {
+                            "if": "$$q.is_correct",
+                            "then": 1,
+                            "else": 0
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$group": {
+                  "_id": "$user_id",
+                  "total_tests": { "$sum": 1 },
+                  "total_score": { "$sum": "$total_score" }
+                }
+              },
+              {
+                "$addFields": {
+                  "avg_score": {
+                    "$cond": {
+                      "if": { "$gt": ["$total_tests", 0] },
+                      "then": { "$divide": ["$total_score", "$total_tests"] },
+                      "else": 0
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "level_index": {
+                    "$indexOfArray": [
+                      ["B1", "B2", "C1", "C2"],
+                      "$test_data.level"
+                    ]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "lower_level": {
+                    "$arrayElemAt": [
+                      ["B1", "B2", "C1", "C2"],
+                      { "$max": [{ "$subtract": ["$level_index", 1] }, 0] }
+                    ]
+                  },
+                  "current_level": {
+                    "$arrayElemAt": [["B1", "B2", "C1", "C2"], "$level_index"]
+                  },
+                  "higher_level": {
+                    "$arrayElemAt": [
+                      ["B1", "B2", "C1", "C2"],
+                      { "$min": [{ "$add": ["$level_index", 1] }, 5] }
+                    ]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "new_level": {
+                    "$switch": {
+                      "branches": [
+                        {
+                          "case": { "$lt": ["$avg_score", 5] },
+                          "then": "$lower_level"
+                        },
+                        {
+                          "case": {
+                            "$and": [
+                              { "$gte": ["$avg_score", 5] },
+                              { "$lte": ["$avg_score", 7] }
+                            ]
+                          },
+                          "then": "$current_level"
+                        },
+                        {
+                          "case": { "$gt": ["$avg_score", 7] },
+                          "then": "$higher_level"
+                        }
+                      ],
+                      "default": "$current_level"
+                    }
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_tests",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "pipeline": [
+                  {
+                    "$match": {
+                      "post_test_actions": "upload_test",
+                      "is_completed": true,
+                      "avg_score": { "$exists": true }
+                    }
+                  },
+                  {
+                    "$addFields": {
+                      "can_post_materials": {
+                        "$cond": {
+                          "if": { "$gte": ["$avg_score", 5] },
+                          "then": true,
+                          "else": false
+                        }
+                      },
+                      "daily_upload_count": {
+                        "$cond": {
+                          "if": { "$eq": [{ "$size": "$user_uploads" }, 0] },
+                          "then": 0,
+                          "else": {
+                            "$arrayElemAt": [
+                              "$user_uploads.daily_upload_count",
+                              -1
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "$match": {
+                      "daily_upload_count": { "$lt": 3 }
+                    }
+                  },
+                  {
+                    "$merge": {
+                      "into": "collection_practice_materials",
+                      "on": "test_id",
+                      "whenMatched": "keepExisting",
+                      "whenNotMatched": {
+                        "$set": {
+                          "user_id": "$user_id",
+                          "upload_date": "$$NOW",
+                          "visibility": "pending"
+                        }
+                      }
+                    }
+                  }
+                ],
+                "purpose": "Xử lý đăng bài kiểm tra của người dùng.",
+                "data_input_from_node": ["collection_user_tests"],
+                "data_output_to_node": "collection_practice_materials"
+              }
+            ],
+            "purpose": "Tính điểm bài test của người dùng, xác định trình độ mới dựa trên điểm trung bình, và cập nhật vào collection_user_tests.",
+            "data_input_from_node": [
+              "collection_user_tests",
+              "collection_tests"
+            ],
+            "data_output_to_node": "collection_user_tests"
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "new_level": { "$exists": true },
+                  "is_completed": true
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_mentors",
+                  "let": {
+                    "user_level": "$new_level"
+                  },
+                  "pipeline": [
+                    {
+                      "$match": {
+                        "$expr": {
+                          "$and": [
+                            { "$eq": ["$status", "active"] },
+                            { "$lt": ["$student_count", "$student_limit"] },
+                            { "$in": ["$$user_level", ["B1", "B2", "C1"]] }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "$sort": {
+                        "rank": 1,
+                        "student_count": 1
+                      }
+                    },
+                    {
+                      "$limit": 1
+                    }
+                  ],
+                  "as": "eligible_mentors"
+                }
+              },
+              {
+                "$unwind": "$eligible_mentors"
+              },
+              {
+                "$addFields": {
+                  "mentor_id": "$eligible_mentors.user_id"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_mentor_students",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Tìm mentor phù hợp cho user sau khi hoàn thành bài test.",
+            "data_input_from_node": ["collection_user_tests"],
+            "data_output_to_node": ["collection_mentor_students"]
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Your Name",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+
+  {
+    "_id": "collection_practice_materials",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "PracticeMaterialData",
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "description": "The unique identifier of the document in MongoDB."
+            },
+            "user_id": {
+              "type": "string",
+              "unique": true,
+              "description": "ID người dùng sở hữu thẻ"
+            },
+            "material_id": {
+              "type": "string",
+              "description": "The unique material identifier."
+            },
+            "upload_date": {
+              "type": "string",
+              "format": "date-time",
+              "description": "The timestamp when the practice material was uploaded."
+            },
+            "level": {
+              "type": "string",
+              "enum": ["B1", "B2", "C1", "C2"],
+              "description": "The difficulty level of the practice material."
+            },
+            "listening": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "part": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3
+                  },
+                  "audio_file": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "description": "Base64-encoded audio file for the entire listening part."
+                  },
+                  "questions": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 15,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "question_id": { "type": "string" },
+                        "question_text": { "type": "string" },
+                        "options": {
+                          "type": "array",
+                          "minItems": 3,
+                          "maxItems": 5,
+                          "items": { "type": "string" }
+                        },
+                        "correct_answer": { "type": "string" }
+                      },
+                      "required": [
+                        "question_id",
+                        "question_text",
+                        "options",
+                        "correct_answer"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "part",
+                  "audio_file",
+                  "audio_metadata",
+                  "questions"
+                ]
+              }
+            },
+            "reading": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "part": { "type": "integer", "minimum": 1, "maximum": 4 },
+                  "passage_id": { "type": "string" },
+                  "text": { "type": "string" },
+                  "questions": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 15,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "question_id": { "type": "string" },
+                        "question_text": { "type": "string" },
+                        "options": {
+                          "type": "array",
+                          "minItems": 3,
+                          "maxItems": 5,
+                          "items": { "type": "string" }
+                        },
+                        "correct_answer": { "type": "string" }
+                      },
+                      "required": [
+                        "question_id",
+                        "question_text",
+                        "options",
+                        "correct_answer"
+                      ]
+                    }
+                  }
+                },
+                "required": ["part", "passage_id", "text", "questions"]
+              }
+            },
+            "writing": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "part": { "type": "integer", "minimum": 1, "maximum": 2 },
+                  "prompt": { "type": "string" },
+                  "sample_answer": { "type": "string" }
+                },
+                "required": ["part", "prompt", "sample_answer"]
+              }
+            },
+            "speaking": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "part": { "type": "integer", "minimum": 1, "maximum": 3 },
+                  "prompt": { "type": "string" },
+                  "sample_answer": { "type": "string" }
+                },
+                "required": ["part", "prompt", "sample_answer"]
+              }
+            },
+            "visibility": {
+              "type": "string",
+              "enum": ["pending", "ready", "rejected"],
+              "description": "The visibility status of the material: pending, ready, or rejected."
+            },
+            "signature": {
+              "type": "string",
+              "description": "Digital signature to verify authorship."
+            },
+            "attempt_count": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The number of times users have attempted this practice material."
+            }
+          },
+          "required": [
+            "_id",
+            "user_id",
+            "material_id",
+            "upload_date",
+            "level",
+            "listening",
+            "reading",
+            "writing",
+            "speaking",
+            "visibility",
+            "signature",
+            "attempt_count"
+          ],
+          "additionalProperties": false
+        },
+        "jsonSample": [
+          {
+            "_id": "67b31d2e8a524196aa2d02e2",
+            "material_id": "MATERIAL123",
+            "upload_date": "2025-02-14T18:26:02.588Z",
+            "level": "B1",
+            "listening": [
+              {
+                "part": 1,
+                "questions": [
+                  {
+                    "question_id": "L1",
+                    "audio_file": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAA...",
+                    "question_text": "What is the main topic?",
+                    "options": ["A. Weather", "B. Travel", "C. Food"],
+                    "correct_answer": "B. Travel"
+                  }
+                ]
+              },
+              {
+                "part": 2,
+                "questions": [
+                  {
+                    "question_id": "L2",
+                    "audio_file": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAA...",
+                    "question_text": "Where is the speaker going?",
+                    "options": [
+                      "A. To the park",
+                      "B. To the mall",
+                      "C. To the beach"
+                    ],
+                    "correct_answer": "C. To the beach"
+                  }
+                ]
+              },
+              {
+                "part": 3,
+                "questions": [
+                  {
+                    "question_id": "L3",
+                    "audio_file": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAA...",
+                    "question_text": "Why is the speaker late?",
+                    "options": [
+                      "A. Traffic jam",
+                      "B. Lost keys",
+                      "C. Alarm didn't ring"
+                    ],
+                    "correct_answer": "A. Traffic jam"
+                  }
+                ]
+              }
+            ],
+            "reading": [
+              {
+                "part": 1,
+                "passage_id": "R1",
+                "text": "Lorem ipsum dolor sit amet...",
+                "questions": [
+                  {
+                    "question_id": "Q1",
+                    "question_text": "What is the main idea?",
+                    "options": ["A. Nature", "B. Technology", "C. History"],
+                    "correct_answer": "A. Nature"
+                  }
+                ]
+              },
+              {
+                "part": 2,
+                "passage_id": "R2",
+                "text": "Another passage text...",
+                "questions": [
+                  {
+                    "question_id": "Q2",
+                    "question_text": "What is the author's opinion?",
+                    "options": ["A. Positive", "B. Negative", "C. Neutral"],
+                    "correct_answer": "B. Negative"
+                  }
+                ]
+              },
+              {
+                "part": 3,
+                "passage_id": "R3",
+                "text": "Yet another passage text...",
+                "questions": [
+                  {
+                    "question_id": "Q3",
+                    "question_text": "What is the purpose of the text?",
+                    "options": ["A. Inform", "B. Persuade", "C. Entertain"],
+                    "correct_answer": "A. Inform"
+                  }
+                ]
+              },
+              {
+                "part": 4,
+                "passage_id": "R4",
+                "text": "Final passage text...",
+                "questions": [
+                  {
+                    "question_id": "Q4",
+                    "question_text": "What is the conclusion?",
+                    "options": ["A. Success", "B. Failure", "C. Unclear"],
+                    "correct_answer": "C. Unclear"
+                  }
+                ]
+              }
+            ],
+            "writing": [
+              {
+                "part": 1,
+                "prompt": "Write an essay about your goals.",
+                "sample_answer": "My goal is to become a successful engineer..."
+              },
+              {
+                "part": 2,
+                "prompt": "Describe your ideal job.",
+                "sample_answer": "My ideal job is one where I can help others..."
+              }
+            ],
+            "speaking": [
+              {
+                "part": 1,
+                "prompt": "Talk about your favorite hobby.",
+                "sample_answer": "My favorite hobby is reading books..."
+              },
+              {
+                "part": 2,
+                "prompt": "Describe your last vacation.",
+                "sample_answer": "I went to the beach and had a great time..."
+              },
+              {
+                "part": 3,
+                "prompt": "Explain why you like learning English.",
+                "sample_answer": "I like learning English because it helps me communicate..."
+              }
+            ],
+            "attempt_count": 150
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "card_id": { "$exists": true, "$type": "string" },
+                  "user_id": { "$exists": true, "$type": "string" }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_user_login",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_login_data"
+                }
+              },
+              {
+                "$unwind": "$user_login_data"
+              },
+              {
+                "$match": {
+                  "user_login_data.token_login.expires_at": { "$gt": "$$NOW" }
+                }
+              }
+            ],
+            "purpose": "kiểm tra xem người dùng có thẻ hay không",
+            "data_input_from_node": ["collection_user_login"],
+
+            "data_output_to_node": ["collection_practice_materials"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "visibility": "pending",
+                  "user_id": { "$exists": true },
+                  "can_post_materials": true
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_practice_materials",
+                  "localField": "material_id",
+                  "foreignField": "material_id",
+                  "as": "existing_materials"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_user_tests",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_test_data"
+                }
+              },
+              {
+                "$match": {
+                  "user_test_data.can_post_materials": true
+                }
+              },
+              {
+                "$addFields": {
+                  "is_duplicate": {
+                    "$cond": {
+                      "if": { "$gt": [{ "$size": "$existing_materials" }, 0] },
+                      "then": true,
+                      "else": false
+                    }
+                  }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "signature",
+                  "foreignField": "signature",
+                  "as": "verified_signature"
+                }
+              },
+              {
+                "$addFields": {
+                  "is_signature_valid": {
+                    "$cond": {
+                      "if": { "$gt": [{ "$size": "$verified_signature" }, 0] },
+                      "then": true,
+                      "else": false
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "is_vstep_compliant": {
+                    "$and": [
+                      { "$eq": [{ "$size": "$listening" }, 3] },
+                      { "$eq": [{ "$size": "$reading" }, 4] },
+                      { "$eq": [{ "$size": "$writing" }, 2] },
+                      { "$eq": [{ "$size": "$speaking" }, 3] }
+                    ]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "material_id": {
+                    "$cond": {
+                      "if": { "$eq": ["$material_id", null] },
+                      "then": { "$toString": { "$uuid": "" } },
+                      "else": "$material_id"
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "listening.questions": {
+                    "$map": {
+                      "input": "$listening.questions",
+                      "as": "question",
+                      "in": {
+                        "question_id": "$$question.question_id",
+                        "audio_file": {
+                          "$cond": {
+                            "if": { "$ne": ["$$question.audio_file", null] },
+                            "then": "$$question.audio_file",
+                            "else": "https://default-audio-storage.com/default.mp3"
+                          }
+                        },
+                        "audio_metadata": {
+                          "$mergeObjects": [
+                            "$$question.audio_metadata",
+                            {
+                              "file_name": {
+                                "$ifNull": [
+                                  "$$question.audio_metadata.file_name",
+                                  "default_audio.mp3"
+                                ]
+                              },
+                              "file_size": {
+                                "$ifNull": [
+                                  "$$question.audio_metadata.file_size",
+                                  0
+                                ]
+                              },
+                              "mime_type": {
+                                "$ifNull": [
+                                  "$$question.audio_metadata.mime_type",
+                                  "audio/mp3"
+                                ]
+                              },
+                              "uploaded_at": {
+                                "$ifNull": [
+                                  "$$question.audio_metadata.uploaded_at",
+                                  "$$NOW"
+                                ]
+                              }
+                            }
+                          ]
+                        },
+                        "question_text": "$$question.question_text",
+                        "options": "$$question.options",
+                        "correct_answer": "$$question.correct_answer"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "visibility": {
+                    "$switch": {
+                      "branches": [
+                        {
+                          "case": {
+                            "$or": [
+                              "$is_duplicate",
+                              { "$not": "$is_signature_valid" }
+                            ]
+                          },
+                          "then": "rejected"
+                        },
+                        {
+                          "case": { "$not": "$is_vstep_compliant" },
+                          "then": "rejected"
+                        },
+                        {
+                          "case": {
+                            "$and": [
+                              "$is_vstep_compliant",
+                              "$is_signature_valid",
+                              { "$not": "$is_duplicate" }
+                            ]
+                          },
+                          "then": "ready"
+                        }
+                      ],
+                      "default": "pending"
+                    }
+                  },
+                  "review_feedback": {
+                    "$cond": {
+                      "if": { "$eq": ["$visibility", "rejected"] },
+                      "then": {
+                        "$concatArrays": [
+                          {
+                            "$cond": {
+                              "if": "$is_duplicate",
+                              "then": ["Duplicate material."],
+                              "else": []
+                            }
+                          },
+                          {
+                            "$cond": {
+                              "if": { "$not": "$is_signature_valid" },
+                              "then": ["Invalid signature."],
+                              "else": []
+                            }
+                          },
+                          {
+                            "$cond": {
+                              "if": { "$not": "$is_vstep_compliant" },
+                              "then": ["Not compliant with VSTEP structure."],
+                              "else": []
+                            }
+                          }
+                        ]
+                      },
+                      "else": []
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "upload_date": {
+                    "$cond": {
+                      "if": { "$eq": ["$upload_date", null] },
+                      "then": "$$NOW",
+                      "else": "$upload_date"
+                    }
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_practice_materials",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Cho phép user đăng bài vào collection_practice_materials nếu đạt điểm trung bình >= 5.",
+            "data_input_from_node": ["collection_user_tests"],
+            "data_output_to_node": ["collection_practice_materials"]
+          }
+        ]
+      }
+    }
+  },
+
+  {
+    "_id": "collection_materials_user_done",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "UserCompletedMaterialData",
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "description": "The unique identifier of the document in MongoDB."
+            },
+            "user_id": {
+              "type": "string",
+              "description": "ID người dùng đã hoàn thành phần thi."
+            },
+            "material_id": {
+              "type": "string",
+              "description": "ID của đề ôn tập (practice material)."
+            },
+            "section": {
+              "type": "string",
+              "enum": ["listening", "reading", "writing", "speaking"],
+              "description": "Kỹ năng thi: listening, reading, writing, hoặc speaking."
+            },
+            "part": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4,
+              "description": "Phần nhỏ trong kỹ năng thi (ví dụ: Listening Part 1)."
+            },
+            "submission_time": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời gian người dùng nộp bài."
+            },
+            "data": {
+              "type": "object",
+              "properties": {
+                "listening": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "question_id": { "type": "string" },
+                      "user_answer": { "type": "string" },
+                      "correct_answer": { "type": "string" }
+                    },
+                    "required": ["question_id", "user_answer", "correct_answer"]
+                  }
+                },
+                "reading": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "question_id": { "type": "string" },
+                      "user_answer": { "type": "string" },
+                      "correct_answer": { "type": "string" }
+                    },
+                    "required": ["question_id", "user_answer", "correct_answer"]
+                  }
+                },
+                "writing": {
+                  "type": "object",
+                  "properties": {
+                    "prompt": { "type": "string" },
+                    "user_answer": { "type": "string" }
+                  },
+                  "required": ["prompt", "user_answer"]
+                },
+                "speaking": {
+                  "type": "object",
+                  "properties": {
+                    "prompt": { "type": "string" },
+                    "user_audio": {
+                      "type": "string",
+                      "contentEncoding": "base64",
+                      "description": "Base64-encoded audio file for the entire listening part."
+                    }
+                  },
+                  "required": ["prompt", "user_audio"]
+                }
+              }
+            },
+            "is_completed": {
+              "type": "boolean",
+              "description": "Trạng thái hoàn thành phần thi."
+            }
+          },
+          "required": [
+            "_id",
+            "user_id",
+            "material_id",
+            "section",
+            "part",
+            "submission_time",
+            "data",
+            "is_completed"
+          ],
+          "additionalProperties": false
+        },
+        "jsonSample": [
+          {
+            "_id": "67b31d2e8a524196aa2d02e7",
+            "user_id": "USER123",
+            "material_id": "MATERIAL123",
+            "section": "listening",
+            "part": 1,
+            "submission_time": "2025-02-14T18:26:02.588Z",
+            "data": {
+              "listening": [
+                {
+                  "question_id": "L1",
+                  "user_answer": "B. Travel",
+                  "correct_answer": "B. Travel"
+                }
+              ]
+            },
+            "is_completed": true
+          },
+          {
+            "_id": "67b31d2e8a524196aa2d02e8",
+            "user_id": "USER123",
+            "material_id": "MATERIAL123",
+            "section": "writing",
+            "part": 1,
+            "submission_time": "2025-02-14T18:26:02.588Z",
+            "data": {
+              "writing": {
+                "prompt": "Write an essay about your goals.",
+                "user_answer": "My goal is to become a successful engineer..."
+              }
+            },
+            "is_completed": true
+          },
+          {
+            "_id": "67b31d2e8a524196aa2d02e9",
+            "user_id": "USER123",
+            "material_id": "MATERIAL123",
+            "section": "speaking",
+            "part": 2,
+            "submission_time": "2025-02-14T18:26:02.588Z",
+            "data": {
+              "speaking": {
+                "prompt": "Describe your last vacation.",
+                "user_audio": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAA..."
+              }
+            },
+            "is_completed": true
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "card_id": { "$exists": true, "$type": "string" },
+                  "user_id": { "$exists": true, "$type": "string" }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_user_login",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_login_data"
+                }
+              },
+              {
+                "$unwind": "$user_login_data"
+              },
+              {
+                "$match": {
+                  "user_login_data.token_login.expires_at": { "$gt": "$$NOW" }
+                }
+              }
+            ],
+            "purpose": "kiểm tra xem người dùng có thẻ hay không",
+            "data_input_from_node": ["collection_user_login"],
+
+            "data_output_to_node": ["collection_materials_user_done"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "material_id": { "$exists": true },
+                  "section": {
+                    "$in": ["listening", "reading", "writing", "speaking"]
+                  },
+                  "part": { "$exists": true }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_practice_materials",
+                  "localField": "material_id",
+                  "foreignField": "material_id",
+                  "as": "material_data"
+                }
+              },
+              {
+                "$unwind": "$material_data"
+              },
+              {
+                "$addFields": {
+                  "data": {
+                    "$cond": {
+                      "if": { "$eq": ["$section", "listening"] },
+                      "then": {
+                        "$map": {
+                          "input": "$answers",
+                          "as": "ans",
+                          "in": {
+                            "question_id": "$$ans.question_id",
+                            "user_answer": "$$ans.user_answer",
+                            "correct_answer": {
+                              "$arrayElemAt": [
+                                "$material_data.listening.questions.correct_answer",
+                                {
+                                  "$indexOfArray": [
+                                    "$material_data.listening.questions.question_id",
+                                    "$$ans.question_id"
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "else": {
+                        "$cond": {
+                          "if": { "$eq": ["$section", "reading"] },
+                          "then": {
+                            "$map": {
+                              "input": "$answers",
+                              "as": "ans",
+                              "in": {
+                                "question_id": "$$ans.question_id",
+                                "user_answer": "$$ans.user_answer",
+                                "correct_answer": {
+                                  "$arrayElemAt": [
+                                    "$material_data.reading.questions.correct_answer",
+                                    {
+                                      "$indexOfArray": [
+                                        "$material_data.reading.questions.question_id",
+                                        "$$ans.question_id"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          "else": {
+                            "$cond": {
+                              "if": { "$eq": ["$section", "writing"] },
+                              "then": {
+                                "prompt": "$material_data.writing.prompt",
+                                "user_answer": "$answers.user_answer"
+                              },
+                              "else": {
+                                "prompt": "$material_data.speaking.prompt",
+                                "user_audio": "$answers.user_audio"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+
+              {
+                "$addFields": {
+                  "history_record": {
+                    "$mergeObjects": [
+                      "$history_record",
+                      {
+                        "card_id": "$card_id",
+                        "user_id": "$user_id",
+                        "material_id": "$material_id",
+                        "section": "$section",
+                        "part": "$part",
+                        "submission_time": "$submission_time",
+                        "data": "$data"
+                      }
+                    ]
+                  }
+                }
+              },
+
+              {
+                "$addFields": {
+                  "_id": { "$toString": { "$uuid": "" } }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_materials_user_done",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Lưu thông tin chi tiết về phần thi mà người dùng đã hoàn thành vào collection_materials_user_done.",
+            "data_input_from_node": ["collection_practice_materials"],
+            "data_output_to_node": ["collection_materials_user_done"]
+          }
+        ]
+      }
+    }
+  },
+
+  {
+    "_id": "collection_user_practice_results",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "UserPracticeResultData",
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "description": "The unique identifier of the document in MongoDB."
+            },
+            "user_id": {
+              "type": "string",
+              "description": "ID người dùng đã hoàn thành bài thi."
+            },
+            "material_id": {
+              "type": "string",
+              "description": "ID của đề ôn tập (practice material)."
+            },
+            "submission_time": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời gian người dùng nộp bài."
+            },
+            "skill_scores": {
+              "type": "object",
+              "properties": {
+                "listening": {
+                  "type": "object",
+                  "properties": {
+                    "part_1": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 25
+                    },
+                    "part_2": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 25
+                    },
+                    "part_3": { "type": "integer", "minimum": 0, "maximum": 25 }
+                  },
+                  "required": ["part_1", "part_2", "part_3"]
+                },
+                "reading": {
+                  "type": "object",
+                  "properties": {
+                    "part_1": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 25
+                    },
+                    "part_2": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 25
+                    },
+                    "part_3": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 25
+                    },
+                    "part_4": { "type": "integer", "minimum": 0, "maximum": 25 }
+                  },
+                  "required": ["part_1", "part_2", "part_3", "part_4"]
+                },
+                "writing": {
+                  "type": "object",
+                  "properties": {
+                    "part_1": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 25
+                    },
+                    "part_2": { "type": "integer", "minimum": 0, "maximum": 25 }
+                  },
+                  "required": ["part_1", "part_2"]
+                },
+                "speaking": {
+                  "type": "object",
+                  "properties": {
+                    "part_1": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 25
+                    },
+                    "part_2": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 25
+                    },
+                    "part_3": { "type": "integer", "minimum": 0, "maximum": 25 }
+                  },
+                  "required": ["part_1", "part_2", "part_3"]
+                }
+              },
+              "required": ["listening", "reading", "writing", "speaking"]
+            },
+            "total_score": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Tổng điểm của bài thi."
+            }
+          },
+          "required": [
+            "_id",
+            "user_id",
+            "material_id",
+            "submission_time",
+            "skill_scores",
+            "total_score"
+          ],
+          "additionalProperties": false
+        },
+        "jsonSample": [
+          {
+            "_id": "67b31d2e8a524196aa2d02e3",
+            "user_id": "USER123",
+            "material_id": "MATERIAL123",
+            "submission_time": "2025-02-14T18:26:02.588Z",
+            "skill_scores": {
+              "listening": {
+                "part_1": 10,
+                "part_2": 8,
+                "part_3": 7
+              },
+              "reading": {
+                "part_1": 6,
+                "part_2": 7,
+                "part_3": 5,
+                "part_4": 2
+              },
+              "writing": {
+                "part_1": 12,
+                "part_2": 8
+              },
+              "speaking": {
+                "part_1": 10,
+                "part_2": 8,
+                "part_3": 7
+              }
+            },
+            "total_score": 90
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "material_id": { "$exists": true },
+                  "user_answers": { "$exists": true }
+                }
+              },
+              {
+                "$match": {
+                  "section": { "$in": ["listening", "reading"] },
+                  "data": { "$exists": true }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_practice_materials",
+                  "localField": "material_id",
+                  "foreignField": "material_id",
+                  "as": "test_data"
+                }
+              },
+              {
+                "$unwind": "$test_data"
+              },
+              {
+                "$addFields": {
+                  "listening_scores": {
+                    "$map": {
+                      "input": "$user_answers.listening",
+                      "as": "ans",
+                      "in": {
+                        "part": "$$ans.part",
+                        "score": {
+                          "$cond": {
+                            "if": {
+                              "$eq": [
+                                "$$ans.user_answer",
+                                {
+                                  "$arrayElemAt": [
+                                    "$test_data.listening.questions.correct_answer",
+                                    {
+                                      "$indexOfArray": [
+                                        "$test_data.listening.questions.question_id",
+                                        "$$ans.question_id"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            "then": 1,
+                            "else": 0
+                          }
+                        }
+                      }
+                    },
+                    "$cond": {
+                      "if": { "$eq": ["$section", "listening"] },
+                      "then": {
+                        "$map": {
+                          "input": "$data.listening",
+                          "as": "q",
+                          "in": {
+                            "question_id": "$$q.question_id",
+                            "score": {
+                              "$cond": {
+                                "if": {
+                                  "$eq": [
+                                    "$$q.user_answer",
+                                    "$$q.correct_answer"
+                                  ]
+                                },
+                                "then": 1,
+                                "else": 0
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "else": []
+                    }
+                  },
+                  "reading_scores": {
+                    "$map": {
+                      "input": "$user_answers.reading",
+                      "as": "ans",
+                      "in": {
+                        "part": "$$ans.part",
+                        "score": {
+                          "$cond": {
+                            "if": {
+                              "$eq": [
+                                "$$ans.user_answer",
+                                {
+                                  "$arrayElemAt": [
+                                    "$test_data.reading.questions.correct_answer",
+                                    {
+                                      "$indexOfArray": [
+                                        "$test_data.reading.questions.question_id",
+                                        "$$ans.question_id"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            "then": 1,
+                            "else": 0
+                          }
+                        }
+                      }
+                    },
+                    "$cond": {
+                      "if": { "$eq": ["$section", "reading"] },
+                      "then": {
+                        "$map": {
+                          "input": "$data.reading",
+                          "as": "q",
+                          "in": {
+                            "question_id": "$$q.question_id",
+                            "score": {
+                              "$cond": {
+                                "if": {
+                                  "$eq": [
+                                    "$$q.user_answer",
+                                    "$$q.correct_answer"
+                                  ]
+                                },
+                                "then": 1,
+                                "else": 0
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "else": []
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "skill_scores": {
+                    "listening": {
+                      "part_1": {
+                        "$sum": {
+                          "$filter": {
+                            "input": "$listening_scores",
+                            "as": "q",
+                            "cond": { "$eq": ["$$q.part", 1] }
+                          }
+                        }
+                      },
+                      "part_2": {
+                        "$sum": {
+                          "$filter": {
+                            "input": "$listening_scores",
+                            "as": "q",
+                            "cond": { "$eq": ["$$q.part", 2] }
+                          }
+                        }
+                      },
+                      "part_3": {
+                        "$sum": {
+                          "$filter": {
+                            "input": "$listening_scores",
+                            "as": "q",
+                            "cond": { "$eq": ["$$q.part", 3] }
+                          }
+                        }
+                      }
+                    },
+                    "reading": {
+                      "part_1": {
+                        "$sum": {
+                          "$filter": {
+                            "input": "$reading_scores",
+                            "as": "q",
+                            "cond": { "$eq": ["$$q.part", 1] }
+                          }
+                        }
+                      },
+                      "part_2": {
+                        "$sum": {
+                          "$filter": {
+                            "input": "$reading_scores",
+                            "as": "q",
+                            "cond": { "$eq": ["$$q.part", 2] }
+                          }
+                        }
+                      },
+                      "part_3": {
+                        "$sum": {
+                          "$filter": {
+                            "input": "$reading_scores",
+                            "as": "q",
+                            "cond": { "$eq": ["$$q.part", 3] }
+                          }
+                        }
+                      },
+                      "part_4": {
+                        "$sum": {
+                          "$filter": {
+                            "input": "$reading_scores",
+                            "as": "q",
+                            "cond": { "$eq": ["$$q.part", 4] }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "total_listening_score": {
+                    "$sum": "$listening_scores.score"
+                  },
+                  "total_reading_score": {
+                    "$sum": "$reading_scores.score"
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_practice_results",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Tính điểm tự động cho Listening và Reading dựa trên đáp án đúng từ collection_practice_materials.",
+            "data_input_from_node": ["collection_practice_materials"],
+            "data_output_to_node": ["collection_user_practice_results"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "material_id": { "$exists": true },
+                  "user_answers.writing": { "$exists": true },
+                  "user_answers.speaking": { "$exists": true }
+                }
+              },
+              {
+                "$match": {
+                  "section": { "$in": ["writing", "speaking"] },
+                  "data": { "$exists": true }
+                }
+              },
+              {
+                "$addFields": {
+                  "writing_submissions": {
+                    "$map": {
+                      "input": "$user_answers.writing",
+                      "as": "part",
+                      "in": {
+                        "part_id": "$$part.part",
+                        "user_answer": "$$part.user_answer",
+                        "status": "pending_review"
+                      }
+                    },
+                    "$cond": {
+                      "if": { "$eq": ["$section", "writing"] },
+                      "then": {
+                        "$map": {
+                          "input": "$data.writing",
+                          "as": "part",
+                          "in": {
+                            "prompt": "$$part.prompt",
+                            "user_answer": "$$part.user_answer",
+                            "status": "pending_review"
+                          }
+                        }
+                      },
+                      "else": []
+                    }
+                  },
+                  "speaking_submissions": {
+                    "$map": {
+                      "input": "$user_answers.speaking",
+                      "as": "part",
+                      "in": {
+                        "part_id": "$$part.part",
+                        "user_audio": "$$part.user_audio",
+                        "status": "pending_review"
+                      }
+                    },
+                    "$cond": {
+                      "if": { "$eq": ["$section", "speaking"] },
+                      "then": {
+                        "$map": {
+                          "input": "$data.speaking",
+                          "as": "part",
+                          "in": {
+                            "prompt": "$$part.prompt",
+                            "user_audio": "$$part.user_audio",
+                            "status": "pending_review"
+                          }
+                        }
+                      },
+                      "else": []
+                    }
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_practice_results",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Lưu câu trả lời viết và ghi âm nói, yêu cầu review để tính điểm.",
+            "data_input_from_node": ["collection_user_tests"],
+            "data_output_to_node": ["collection_user_practice_results"]
+          },
+          {
+            "pipeline": [
+              {
+                "$addFields": {
+                  "total_score": {
+                    "$sum": [
+                      "$skill_scores.listening.part_1",
+                      "$skill_scores.listening.part_2",
+                      "$skill_scores.listening.part_3",
+                      "$skill_scores.reading.part_1",
+                      "$skill_scores.reading.part_2",
+                      "$skill_scores.reading.part_3",
+                      "$skill_scores.reading.part_4",
+                      "$skill_scores.writing.part_1",
+                      "$skill_scores.writing.part_2",
+                      "$skill_scores.speaking.part_1",
+                      "$skill_scores.speaking.part_2",
+                      "$skill_scores.speaking.part_3"
+                    ]
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_practice_results",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Tính tổng điểm và cập nhật kết quả cuối cùng vào collection_user_practice_results.",
+            "data_input_from_node": ["collection_user_practice_results"],
+            "data_output_to_node": ["collection_user_practice_results"]
+          }
+        ]
+      }
+    }
+  },
+
+  {
+    "_id": "collection_writing_topics",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "WritingTopics",
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "description": "The unique identifier of the topic."
+            },
+            "topic_id": {
+              "type": "string",
+              "unique": true,
+              "description": "ID duy nhất của chủ đề bài viết."
+            },
+            "title": {
+              "type": "string",
+              "description": "Tiêu đề của chủ đề bài viết."
+            },
+            "description": {
+              "type": "string",
+              "description": "Mô tả chi tiết về chủ đề bài viết."
+            }
+          },
+          "required": ["_id", "topic_id", "title", "description", "difficulty"],
+          "additionalProperties": false
+        },
+        "jsonSample": [
+          {
+            "_id": "TOPIC001",
+            "topic_id": "t12345",
+            "title": "The Importance of Education",
+            "description": "Write an essay on why education is crucial for personal and societal development."
+          },
+          {
+            "_id": "TOPIC002",
+            "topic_id": "t67890",
+            "title": "The Impact of Technology on Daily Life",
+            "description": "Discuss how technology has changed the way we live, work, and communicate."
+          }
+        ]
+      }
+    }
+  },
+
+  {
+    "_id": "collection_user_writing",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "UserWritingData",
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "description": "The unique identifier of the user writing record."
+            },
+            "user_id": {
+              "type": "string",
+              "description": "ID of the user who wrote the essay."
+            },
+            "card_id": {
+              "type": "string",
+              "description": "Card ID associated with the user (nullable if not applicable).",
+              "nullable": true
+            },
+            "topic_id": {
+              "type": "string",
+              "description": "The ID of the randomly selected topic from the writing topics collection."
+            },
+            "written_essay": {
+              "type": "string",
+              "description": "The essay written by the user."
+            },
+            "reactions": {
+              "type": "object",
+              "properties": {
+                "like": {
+                  "type": "integer",
+                  "description": "Number of likes received."
+                },
+                "love": {
+                  "type": "integer",
+                  "description": "Number of loves received."
+                },
+                "wow": {
+                  "type": "integer",
+                  "description": "Number of wows received."
+                },
+                "angry": {
+                  "type": "integer",
+                  "description": "Number of angry reactions received."
+                },
+                "haha": {
+                  "type": "integer",
+                  "description": "Number of haha reactions received."
+                }
+              },
+              "required": ["like", "love", "wow", "angry", "haha"],
+              "additionalProperties": false,
+              "description": "Reactions received for the essay."
+            },
+            "total_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10,
+              "description": "Total score calculated based on reactions."
+            }
+          },
+          "required": [
+            "_id",
+            "user_id",
+            "topic_id",
+            "written_essay",
+            "reactions",
+            "total_score"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "card_id": { "$exists": true, "$type": "string" },
+                  "user_id": { "$exists": true, "$type": "string" }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_user_login",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_login_data"
+                }
+              },
+              {
+                "$unwind": "$user_login_data"
+              },
+              {
+                "$match": {
+                  "user_login_data.token_login.expires_at": { "$gt": "$$NOW" }
+                }
+              }
+            ],
+            "purpose": "kiểm tra xem người dùng có thẻ hay không",
+            "data_input_from_node": ["collection_user_login"],
+
+            "data_output_to_node": ["collection_user_writing"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "status": "active"
+                }
+              },
+              {
+                "$sample": {
+                  "size": 1
+                }
+              },
+              {
+                "$project": {
+                  "_id": 0,
+                  "topic_id": "$_id",
+                  "topic_title": "$title",
+                  "topic_description": "$description"
+                }
+              }
+            ],
+            "purpose": "Chọn ngẫu nhiên một chủ đề từ collection_writing_topics.",
+            "data_input_from_node": ["collection_writing_topics"],
+            "data_output_to_node": ["collection_user_writing"]
+          },
+          {
+            "pipeline": [
+              {
+                "$addFields": {
+                  "total_score": {
+                    "$min": [
+                      10,
+                      {
+                        "$max": [
+                          0,
+                          {
+                            "$subtract": [
+                              {
+                                "$sum": [
+                                  "$reactions.like",
+                                  "$reactions.love",
+                                  "$reactions.wow",
+                                  "$reactions.haha"
+                                ]
+                              },
+                              {
+                                "$multiply": ["$reactions.angry", 2]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "$project": {
+                  "_id": 1,
+                  "user_id": 1,
+                  "topic_id": 1,
+                  "written_essay": 1,
+                  "reactions": 1,
+                  "total_score": 1
+                }
+              }
+            ],
+            "purpose": "Tính toán tổng điểm dựa trên phản ứng và lưu vào cơ sở dữ liệu.",
+            "data_input_from_node": ["conAI_url"],
+            "data_output_to_node": ["collection_user_writing"]
+          },
+          {
+            "pipeline": [
+              {
+                "$merge": {
+                  "into": "collection_user_writing",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Lưu kết quả bài thi viết vào collection_user_writing.",
+            "data_input_from_node": ["collection_user_writing"],
+            "data_output_to_node": []
+          }
+        ]
+      }
+    }
+  },
+
+  {
+    "_id": "collection_leaderboard",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "LeaderboardData",
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "description": "The unique identifier of the document in MongoDB."
+            },
+            "user_id": {
+              "type": "string",
+              "description": "The unique user identifier.",
+              "unique": true
+            },
+            "leaderboard_score": {
+              "type": "number",
+              "minimum": 0,
+              "description": "The total score of the user for the leaderboard, calculated as 0.7 * practice score + 0.3 * writing score."
+            },
+            "rank": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "The current rank of the user on the leaderboard."
+            },
+            "current_streak": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The number of consecutive weeks the user has maintained or improved their rank."
+            },
+            "longest_streak": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The longest streak of consecutive weeks the user has maintained or improved their rank."
+            },
+            "last_rank": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "The rank of the user from the previous leaderboard update."
+            },
+            "top10_history": {
+              "type": "object",
+              "properties": {
+                "entered_top10_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "The timestamp when the user entered the top 10."
+                },
+                "time_in_top10": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "The total time (in days) the user has spent in the top 10."
+                }
+              },
+              "required": ["entered_top10_at", "time_in_top10"],
+              "description": "History of the user's presence in the top 10."
+            },
+            "last_reset_time": {
+              "type": "string",
+              "format": "date-time",
+              "description": "The timestamp of the last leaderboard reset."
+            }
+          },
+          "required": [
+            "_id",
+            "user_id",
+            "leaderboard_score",
+            "rank",
+            "current_streak",
+            "longest_streak",
+            "last_rank",
+            "top10_history",
+            "last_reset_time"
+          ],
+          "additionalProperties": false
+        },
+        "jsonSample": [
+          {
+            "_id": "USER_LB_001",
+            "user_id": "81f204d0-5ef7-4dd0-adfe-69f8f83860db",
+            "leaderboard_score": 85.3,
+            "rank": 3,
+            "current_streak": 4,
+            "longest_streak": 6,
+            "last_rank": 5,
+            "top10_history": {
+              "entered_top10_at": "2025-02-14T18:26:02.588Z",
+              "time_in_top10": 7
+            },
+            "last_reset_time": "2025-02-14T02:00:00.000Z"
+          },
+          {
+            "_id": "USER_LB_002",
+            "user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "leaderboard_score": 92.7,
+            "rank": 1,
+            "current_streak": 10,
+            "longest_streak": 10,
+            "last_rank": 1,
+            "top10_history": {
+              "entered_top10_at": "2025-02-07T18:26:02.588Z",
+              "time_in_top10": 14
+            },
+            "last_reset_time": "2025-02-14T02:00:00.000Z"
+          },
+          {
+            "_id": "USER_LB_003",
+            "user_id": "f9e8d7c6-b5a4-3210-9876-543210fedcba",
+            "leaderboard_score": 68.2,
+            "rank": 7,
+            "current_streak": 1,
+            "longest_streak": 3,
+            "last_rank": 8,
+            "top10_history": {
+              "entered_top10_at": null,
+              "time_in_top10": 0
+            },
+            "last_reset_time": "2025-02-14T02:00:00.000Z"
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "card_id": { "$exists": true, "$type": "string" },
+                  "user_id": { "$exists": true, "$type": "string" }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_user_login",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_login_data"
+                }
+              },
+              {
+                "$unwind": "$user_login_data"
+              },
+              {
+                "$match": {
+                  "user_login_data.token_login.expires_at": { "$gt": "$$NOW" }
+                }
+              }
+            ],
+            "purpose": "kiểm tra xem người dùng có thẻ hay không",
+            "data_input_from_node": ["collection_user_login"],
+
+            "data_output_to_node": ["collection_leaderboard"]
+          },
+          {
+            "pipeline": [
+              {
+                "$lookup": {
+                  "from": "collection_user_practice_results",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "practice_results"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_user_writing",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "writing_results"
+                }
+              },
+              {
+                "$addFields": {
+                  "total_practice_score": {
+                    "$sum": "$practice_results.total_score"
+                  },
+                  "total_writing_score": {
+                    "$sum": "$writing_results.total_score"
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "leaderboard_score": {
+                    "$add": [
+                      { "$multiply": [0.7, "$total_practice_score"] },
+                      { "$multiply": [0.3, "$total_writing_score"] }
+                    ]
+                  }
+                }
+              },
+              {
+                "$project": {
+                  "_id": 1,
+                  "user_id": 1,
+                  "leaderboard_score": 1
+                }
+              }
+            ],
+            "purpose": "Tính tổng điểm cho leaderboard dựa trên practice và writing results",
+            "data_input_from_node": [
+              "collection_user_practice_results",
+              "collection_user_writing"
+            ],
+            "data_output_to_node": ["collection_leaderboard"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "reset_time": { "$lte": "$$NOW" }
+                }
+              },
+              {
+                "$set": {
+                  "leaderboard_score": 0,
+                  "rank": null,
+                  "last_reset_time": "$$NOW"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_leaderboard",
+                  "on": "_id",
+                  "whenMatched": "replace",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Reset dữ liệu leaderboard vào mỗi sáng thứ 2 lúc 2h sáng",
+            "data_input_from_node": ["collection_leaderboard"],
+            "data_output_to_node": []
+          },
+          {
+            "pipeline": [
+              {
+                "$sort": {
+                  "leaderboard_score": -1
+                }
+              },
+              {
+                "$group": {
+                  "_id": null,
+                  "users": {
+                    "$push": {
+                      "user_id": "$user_id",
+                      "score": "$leaderboard_score"
+                    }
+                  }
+                }
+              },
+              {
+                "$unwind": {
+                  "path": "$users",
+                  "includeArrayIndex": "rank"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_leaderboard",
+                  "on": "user_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$addFields": {
+                  "current_streak": {
+                    "$cond": {
+                      "if": { "$eq": ["$rank", "$last_rank"] },
+                      "then": { "$add": ["$current_streak", 1] },
+                      "else": 1
+                    }
+                  },
+                  "longest_streak": {
+                    "$max": ["$current_streak", "$longest_streak"]
+                  },
+                  "last_rank": "$rank"
+                }
+              },
+              {
+                "$set": {
+                  "top10_history": {
+                    "$cond": {
+                      "if": { "$lte": ["$rank", 10] },
+                      "then": {
+                        "entered_top10_at": {
+                          "$ifNull": [
+                            "$top10_history.entered_top10_at",
+                            "$$NOW"
+                          ]
+                        },
+                        "time_in_top10": {
+                          "$cond": {
+                            "if": {
+                              "$ifNull": [
+                                "$top10_history.entered_top10_at",
+                                false
+                              ]
+                            },
+                            "then": {
+                              "$divide": [
+                                {
+                                  "$subtract": [
+                                    "$$NOW",
+                                    "$top10_history.entered_top10_at"
+                                  ]
+                                },
+                                86400000
+                              ]
+                            },
+                            "else": 0
+                          }
+                        }
+                      },
+                      "else": {
+                        "entered_top10_at": null,
+                        "time_in_top10": 0
+                      }
+                    }
+                  }
+                }
+              }
+            ],
+            "purpose": "Cập nhật rank và lịch sử trụ hạng của người dùng",
+            "data_input_from_node": ["collection_leaderboard"],
+            "data_output_to_node": []
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Your Name",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+
+  {
+    "_id": "collection_elite_partner",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "ElitePartnerData",
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "description": "The unique identifier of the document in MongoDB."
+            },
+            "user_id": {
+              "type": "string",
+              "description": "The unique user identifier.",
+              "unique": true
+            },
+            "is_elite_partner": {
+              "type": "boolean",
+              "description": "Indicates if the user is an Elite Partner."
+            },
+            "eligible_for_elite": {
+              "type": "boolean",
+              "description": "Indicates if the user meets the criteria to become an Elite Partner."
+            },
+            "elite_benefits": {
+              "type": "object",
+              "properties": {
+                "exclusive_content": {
+                  "type": "boolean",
+                  "description": "Access to exclusive content."
+                },
+                "priority_support": {
+                  "type": "boolean",
+                  "description": "Priority customer support."
+                },
+                "discounts": {
+                  "type": "boolean",
+                  "description": "Special discounts for services."
+                }
+              },
+              "required": [
+                "exclusive_content",
+                "priority_support",
+                "discounts"
+              ],
+              "description": "Benefits granted to Elite Partners."
+            },
+            "top10_history": {
+              "type": "object",
+              "properties": {
+                "entered_top10_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "The timestamp when the user entered the top 10."
+                },
+                "time_in_top10": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "The total time (in days) the user has spent in the top 10."
+                }
+              },
+              "required": ["entered_top10_at", "time_in_top10"],
+              "description": "History of the user's presence in the top 10."
+            },
+            "status": {
+              "type": "string",
+              "enum": ["active", "inactive", "revoked"],
+              "description": "Current status of the Elite Partner."
+            },
+            "revocation_reason": {
+              "type": "string",
+              "nullable": true,
+              "description": "Reason for revoking Elite Partner status, if applicable."
+            },
+            "revocation_date": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true,
+              "description": "The timestamp when the Elite Partner status was revoked."
+            },
+            "last_verification_date": {
+              "type": "string",
+              "format": "date-time",
+              "description": "The last date the user's Elite Partner status was verified."
+            }
+          },
+          "required": [
+            "_id",
+            "user_id",
+            "is_elite_partner",
+            "eligible_for_elite",
+            "elite_benefits",
+            "top10_history",
+            "status"
+          ],
+          "additionalProperties": false
+        },
+        "jsonSample": [
+          {
+            "_id": "ELITE_001",
+            "user_id": "81f204d0-5ef7-4dd0-adfe-69f8f83860db",
+            "is_elite_partner": true,
+            "eligible_for_elite": true,
+            "elite_benefits": {
+              "exclusive_content": true,
+              "priority_support": true,
+              "discounts": true
+            },
+            "top10_history": {
+              "entered_top10_at": "2025-02-01T00:00:00.000Z",
+              "time_in_top10": 21
+            },
+            "status": "active",
+            "revocation_reason": null,
+            "revocation_date": null,
+            "last_verification_date": "2025-02-14T18:26:02.588Z"
+          },
+          {
+            "_id": "ELITE_002",
+            "user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "is_elite_partner": false,
+            "eligible_for_elite": false,
+            "elite_benefits": {
+              "exclusive_content": false,
+              "priority_support": false,
+              "discounts": false
+            },
+            "top10_history": {
+              "entered_top10_at": "2025-02-05T00:00:00.000Z",
+              "time_in_top10": 10
+            },
+            "status": "revoked",
+            "revocation_reason": "Fell out of top 10 for 3 consecutive weeks.",
+            "revocation_date": "2025-02-21T00:00:00.000Z",
+            "last_verification_date": "2025-02-14T18:26:02.588Z"
+          },
+          {
+            "_id": "ELITE_003",
+            "user_id": "f9e8d7c6-b5a4-3210-9876-543210fedcba",
+            "is_elite_partner": false,
+            "eligible_for_elite": false,
+            "elite_benefits": {
+              "exclusive_content": false,
+              "priority_support": false,
+              "discounts": false
+            },
+            "top10_history": {
+              "entered_top10_at": null,
+              "time_in_top10": 0
+            },
+            "status": "inactive",
+            "revocation_reason": null,
+            "revocation_date": null,
+            "last_verification_date": "2025-02-14T18:26:02.588Z"
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "card_id": { "$exists": true, "$type": "string" },
+                  "user_id": { "$exists": true, "$type": "string" }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_user_login",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_login_data"
+                }
+              },
+              {
+                "$unwind": "$user_login_data"
+              },
+              {
+                "$match": {
+                  "user_login_data.token_login.expires_at": { "$gt": "$$NOW" }
+                }
+              }
+            ],
+            "purpose": "kiểm tra xem người dùng có thẻ hay không",
+            "data_input_from_node": ["collection_user_login"],
+
+            "data_output_to_node": ["collection_elite_partner"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "rank": { "$lte": 10 },
+                  "top10_history.time_in_top10": { "$gte": 14 }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_leaderboard",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "leaderboard_data"
+                }
+              },
+              {
+                "$addFields": {
+                  "eligible_for_elite": {
+                    "$cond": {
+                      "if": {
+                        "$and": [
+                          { "$lte": ["$rank", 10] },
+                          { "$gte": ["$top10_history.time_in_top10", 14] }
+                        ]
+                      },
+                      "then": true,
+                      "else": false
+                    }
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "elite_partners",
+                  "on": "user_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Xét điều kiện để trở thành Elite Partner",
+            "data_input_from_node": ["collection_leaderboard"],
+            "data_output_to_node": ["elite_partners"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "rank": { "$lte": 10 },
+                  "top10_history.time_in_top10": { "$gte": 14 }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_leaderboard",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "leaderboard_data"
+                }
+              },
+              {
+                "$addFields": {
+                  "eligible_for_elite": {
+                    "$cond": {
+                      "if": {
+                        "$and": [
+                          { "$lte": ["$rank", 10] },
+                          { "$gte": ["$top10_history.time_in_top10", 14] }
+                        ]
+                      },
+                      "then": true,
+                      "else": false
+                    }
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "elite_partners",
+                  "on": "user_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Xét điều kiện để trở thành Elite Partner",
+            "data_input_from_node": ["collection_leaderboard"],
+            "data_output_to_node": ["elite_partners"]
+          },
+          {
+            "pipeline": [
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$addFields": {
+                  "is_signature_valid": {
+                    "$function": {
+                      "body": "function(signature, public_key, qr_code) { const crypto = require('crypto'); const verify = crypto.createVerify('SHA256'); verify.update(qr_code); return verify.verify(public_key, signature, 'base64'); }",
+                      "args": [
+                        "$card_data.signature",
+                        "$card_data.public_key",
+                        "$card_data.qr_code"
+                      ],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "elite_benefits": {
+                    "exclusive_content": true,
+                    "priority_support": true,
+                    "discounts": true
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "elite_partners",
+                  "on": "user_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Tạo quyền lợi và xác thực chữ ký số để trở thành Elite Partner",
+            "data_input_from_node": ["collection_cards"],
+            "data_output_to_node": ["elite_partners"]
+          },
+          {
+            "pipeline": [
+              {
+                "$merge": {
+                  "into": "elite_partners",
+                  "on": "user_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Lưu thông tin Elite Partner vào cơ sở dữ liệu",
+            "data_input_from_node": ["elite_partners"],
+            "data_output_to_node": []
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "status": "active",
+                  "rank": { "$gt": 10 },
+                  "weeks_out_of_top10": { "$gte": 3 }
+                }
+              },
+              {
+                "$set": {
+                  "status": "revoked",
+                  "revocation_reason": "Fell out of top 10 for 3 consecutive weeks.",
+                  "revocation_date": "$$NOW"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "elite_partners",
+                  "on": "user_id",
+                  "whenMatched": "replace",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Hủy tư cách Elite Partner nếu không trụ hạng trong top 10 trong 3 tuần liên tiếp",
+            "data_input_from_node": ["elite_partners"],
+            "data_output_to_node": []
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Your Name",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  }
+]
