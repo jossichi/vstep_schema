@@ -1019,8 +1019,8 @@
                   },
                   "audio_file": {
                     "type": "string",
-                    "contentEncoding": "base64",
-                    "description": "Base64-encoded audio file for the entire listening part."
+                    "description": "Either a Base64-encoded audio file or a URL pointing to an audio file.",
+                    "oneOf": [{ "format": "base64" }, { "format": "uri" }]
                   },
                   "questions": {
                     "type": "array",
@@ -1048,12 +1048,7 @@
                     }
                   }
                 },
-                "required": [
-                  "part",
-                  "audio_file",
-                  "audio_metadata",
-                  "questions"
-                ]
+                "required": ["part", "audio_file", "questions"]
               }
             },
             "reading": {
@@ -1157,16 +1152,17 @@
         "jsonSample": [
           {
             "_id": "67b31d2e8a524196aa2d02e2",
+            "user_id": "USER12345",
             "material_id": "MATERIAL123",
             "upload_date": "2025-02-14T18:26:02.588Z",
             "level": "B1",
             "listening": [
               {
                 "part": 1,
+                "audio_file": "https://example.com/audio/sample1.mp3",
                 "questions": [
                   {
                     "question_id": "L1",
-                    "audio_file": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAA...",
                     "question_text": "What is the main topic?",
                     "options": ["A. Weather", "B. Travel", "C. Food"],
                     "correct_answer": "B. Travel"
@@ -1175,10 +1171,10 @@
               },
               {
                 "part": 2,
+                "audio_file": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAA...",
                 "questions": [
                   {
                     "question_id": "L2",
-                    "audio_file": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAA...",
                     "question_text": "Where is the speaker going?",
                     "options": [
                       "A. To the park",
@@ -1191,10 +1187,10 @@
               },
               {
                 "part": 3,
+                "audio_file": "https://example.com/audio/sample3.wav",
                 "questions": [
                   {
                     "question_id": "L3",
-                    "audio_file": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAA...",
                     "question_text": "Why is the speaker late?",
                     "options": [
                       "A. Traffic jam",
@@ -1210,7 +1206,7 @@
               {
                 "part": 1,
                 "passage_id": "R1",
-                "text": "Lorem ipsum dolor sit amet...",
+                "text": "Tung Tung Tung Sahua vs Tralalelo Tralala who will win this match.",
                 "questions": [
                   {
                     "question_id": "Q1",
@@ -1223,7 +1219,7 @@
               {
                 "part": 2,
                 "passage_id": "R2",
-                "text": "Another passage text...",
+                "text": "Another passage text about technology and its impact.",
                 "questions": [
                   {
                     "question_id": "Q2",
@@ -1236,7 +1232,7 @@
               {
                 "part": 3,
                 "passage_id": "R3",
-                "text": "Yet another passage text...",
+                "text": "Yet another passage discussing global warming.",
                 "questions": [
                   {
                     "question_id": "Q3",
@@ -1249,7 +1245,7 @@
               {
                 "part": 4,
                 "passage_id": "R4",
-                "text": "Final passage text...",
+                "text": "Final passage about the future of AI.",
                 "questions": [
                   {
                     "question_id": "Q4",
@@ -1264,31 +1260,33 @@
               {
                 "part": 1,
                 "prompt": "Write an essay about your goals.",
-                "sample_answer": "My goal is to become a successful engineer..."
+                "sample_answer": "My goal is to become a successful engineer and contribute to society."
               },
               {
                 "part": 2,
                 "prompt": "Describe your ideal job.",
-                "sample_answer": "My ideal job is one where I can help others..."
+                "sample_answer": "My ideal job is one where I can help others and grow professionally."
               }
             ],
             "speaking": [
               {
                 "part": 1,
                 "prompt": "Talk about your favorite hobby.",
-                "sample_answer": "My favorite hobby is reading books..."
+                "sample_answer": "My favorite hobby is reading books because it helps me relax."
               },
               {
                 "part": 2,
                 "prompt": "Describe your last vacation.",
-                "sample_answer": "I went to the beach and had a great time..."
+                "sample_answer": "I went to the beach and had a great time with my family."
               },
               {
                 "part": 3,
                 "prompt": "Explain why you like learning English.",
-                "sample_answer": "I like learning English because it helps me communicate..."
+                "sample_answer": "I like learning English because it helps me communicate globally."
               }
             ],
+            "visibility": "pending",
+            "signature": "DIGITAL_SIGNATURE_12345",
             "attempt_count": 150
           }
         ]
@@ -1411,6 +1409,17 @@
                 }
               },
               {
+                "$match": {
+                  "listening.questions.audio_file": {
+                    "$exists": true,
+                    "$and": [
+                      { "$ne": ["$$question.audio_file", null] },
+                      { "$ne": ["$$question.audio_file", ""] }
+                    ]
+                  }
+                }
+              },
+              {
                 "$addFields": {
                   "listening.questions": {
                     "$map": {
@@ -1420,9 +1429,25 @@
                         "question_id": "$$question.question_id",
                         "audio_file": {
                           "$cond": {
-                            "if": { "$ne": ["$$question.audio_file", null] },
-                            "then": "$$question.audio_file",
-                            "else": "https://default-audio-storage.com/default.mp3"
+                            "if": {
+                              "$and": [
+                                { "$ne": ["$$question.audio_file", null] },
+                                { "$ne": ["$$question.audio_file", ""] }
+                              ]
+                            },
+                            "then": {
+                              "$cond": {
+                                "if": {
+                                  "$regexMatch": {
+                                    "input": "$$question.audio_file",
+                                    "regex": "^https?://",
+                                    "options": "i"
+                                  }
+                                },
+                                "then": "$$question.audio_file",
+                                "else": "$$question.audio_file"
+                              }
+                            }
                           }
                         },
                         "audio_metadata": {
