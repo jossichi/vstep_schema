@@ -333,7 +333,7 @@
     "personal": {
       "node_info": {
         "name": "English Test System",
-        "author": "Your Name",
+        "author": "Joshept",
         "version": "1.0",
         "year": "2025"
       }
@@ -362,10 +362,10 @@
             "if": { "properties": { "test_type": { "const": "listening" } } },
             "then": {
               "properties": {
-                "audio_file": {
+                "audio_url": {
                   "type": "string",
-                  "contentEncoding": "base64",
-                  "description": "Base64-encoded audio file uploaded by the user."
+                  "format": "uri",
+                  "description": "URL của file audio. Trường này chứa URL của file audio, dù là từ upload hoặc nhập trực tiếp."
                 },
                 "questions": {
                   "type": "array",
@@ -386,12 +386,13 @@
                       "question_id",
                       "question_text",
                       "options",
-                      "correct_answer"
+                      "correct_answer",
+                      "audio_url"
                     ]
                   }
                 }
               },
-              "required": ["audio_file", "questions"]
+              "required": ["audio_url", "questions"]
             }
           },
           {
@@ -469,11 +470,77 @@
         "additionalProperties": false
       }
     },
-
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "test_type": "listening"
+                }
+              },
+              {
+                "$addFields": {
+                  "is_upload": {
+                    "$cond": {
+                      "if": { "$ne": ["$audio_url", null] },
+                      "then": true,
+                      "else": false
+                    }
+                  }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "uploads",
+                  "localField": "audio_url",
+                  "foreignField": "_id",
+                  "as": "uploaded_audio_info"
+                }
+              },
+              {
+                "$addFields": {
+                  "processed_audio_url": {
+                    "$cond": {
+                      "if": "$is_upload",
+                      "then": {
+                        "$arrayElemAt": ["$uploaded_audio_info.url", 0]
+                      },
+                      "else": "$audio_url"
+                    }
+                  }
+                }
+              },
+              {
+                "$project": {
+                  "audio_url": "$processed_audio_url",
+                  "questions": 1,
+                  "test_id": 1,
+                  "test_type": 1,
+                  "level": 1
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_tests",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Pipeline xử lý logic lưu trữ audio_url: nếu user upload file thì băm ra URL, nếu user cung cấp URL thì lưu trực tiếp.",
+            "data_input_from_node": ["collection_tests", "uploads"],
+            "data_output_to_node": "collection_tests"
+          }
+        ]
+      }
+    },
     "personal": {
       "node_info": {
         "name": "English Test System",
-        "author": "Your Name",
+        "author": "Joshept",
         "version": "1.0",
         "year": "2025"
       }
@@ -505,13 +572,19 @@
                       "question_id": { "type": "string" },
                       "user_answer": { "type": "string" },
                       "is_correct": { "type": "boolean" },
-                      "correct_answer": { "type": "string" }
+                      "correct_answer": { "type": "string" },
+                      "audio_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "URL của file audio liên quan đến câu hỏi listening."
+                      }
                     },
                     "required": [
                       "question_id",
                       "user_answer",
                       "is_correct",
-                      "correct_answer"
+                      "correct_answer",
+                      "audio_url"
                     ]
                   },
                   "default": []
@@ -966,7 +1039,7 @@
     "personal": {
       "node_info": {
         "name": "English Test System",
-        "author": "Your Name",
+        "author": "Joshept",
         "version": "1.0",
         "year": "2025"
       }
@@ -988,7 +1061,7 @@
             },
             "user_id": {
               "type": "string",
-              "unique": true,
+
               "description": "ID người dùng sở hữu thẻ"
             },
             "material_id": {
@@ -1017,7 +1090,7 @@
                     "minimum": 1,
                     "maximum": 3
                   },
-                  "audio_file": {
+                  "audio_url": {
                     "type": "string",
                     "description": "Either a Base64-encoded audio file or a URL pointing to an audio file.",
                     "oneOf": [{ "format": "base64" }, { "format": "uri" }]
@@ -1048,7 +1121,7 @@
                     }
                   }
                 },
-                "required": ["part", "audio_file", "questions"]
+                "required": ["part", "audio_url", "questions"]
               }
             },
             "reading": {
@@ -1159,7 +1232,7 @@
             "listening": [
               {
                 "part": 1,
-                "audio_file": "https://example.com/audio/sample1.mp3",
+                "audio_url": "https://example.com/audio/sample1.mp3",
                 "questions": [
                   {
                     "question_id": "L1",
@@ -1171,7 +1244,7 @@
               },
               {
                 "part": 2,
-                "audio_file": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAA...",
+                "audio_url": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAA...",
                 "questions": [
                   {
                     "question_id": "L2",
@@ -1187,7 +1260,7 @@
               },
               {
                 "part": 3,
-                "audio_file": "https://example.com/audio/sample3.wav",
+                "audio_url": "https://example.com/audio/sample3.wav",
                 "questions": [
                   {
                     "question_id": "L3",
@@ -1410,11 +1483,11 @@
               },
               {
                 "$match": {
-                  "listening.questions.audio_file": {
+                  "listening.questions.audio_url": {
                     "$exists": true,
                     "$and": [
-                      { "$ne": ["$$question.audio_file", null] },
-                      { "$ne": ["$$question.audio_file", ""] }
+                      { "$ne": ["$$question.audio_url", null] },
+                      { "$ne": ["$$question.audio_url", ""] }
                     ]
                   }
                 }
@@ -1427,25 +1500,25 @@
                       "as": "question",
                       "in": {
                         "question_id": "$$question.question_id",
-                        "audio_file": {
+                        "audio_url": {
                           "$cond": {
                             "if": {
                               "$and": [
-                                { "$ne": ["$$question.audio_file", null] },
-                                { "$ne": ["$$question.audio_file", ""] }
+                                { "$ne": ["$$question.audio_url", null] },
+                                { "$ne": ["$$question.audio_url", ""] }
                               ]
                             },
                             "then": {
                               "$cond": {
                                 "if": {
                                   "$regexMatch": {
-                                    "input": "$$question.audio_file",
+                                    "input": "$$question.audio_url",
                                     "regex": "^https?://",
                                     "options": "i"
                                   }
                                 },
-                                "then": "$$question.audio_file",
-                                "else": "$$question.audio_file"
+                                "then": "$$question.audio_url",
+                                "else": "$$question.audio_url"
                               }
                             }
                           }
@@ -3344,7 +3417,7 @@
     "personal": {
       "node_info": {
         "name": "English Test System",
-        "author": "Your Name",
+        "author": "Joshept",
         "version": "1.0",
         "year": "2025"
       }
@@ -3734,7 +3807,7 @@
     "personal": {
       "node_info": {
         "name": "English Test System",
-        "author": "Your Name",
+        "author": "Joshept",
         "version": "1.0",
         "year": "2025"
       }
