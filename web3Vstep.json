@@ -1224,53 +1224,71 @@
         },
         "jsonSample": [
           {
-            "_id": "67b31d2e8a524196aa2d02e2",
-            "user_id": "USER12345",
-            "material_id": "MATERIAL123",
-            "upload_date": "2025-02-14T18:26:02.588Z",
-            "level": "B1",
+            "_id": "material_001",
+            "user_id": "user_12345",
+            "material_id": "mat_67890",
+            "upload_date": "2023-10-15T14:35:00Z",
+            "level": "B2",
             "listening": [
               {
                 "part": 1,
-                "audio_url": "https://example.com/audio/sample1.mp3",
+                "audio_url": "https://example.com/audio/listening_part1.mp3",
                 "questions": [
                   {
-                    "question_id": "L1",
-                    "question_text": "What is the main topic?",
-                    "options": ["A. Weather", "B. Travel", "C. Food"],
-                    "correct_answer": "B. Travel"
+                    "question_id": "q1",
+                    "question_text": "What is the main topic of the conversation?",
+                    "options": [
+                      "The importance of saving money.",
+                      "How to invest in stocks.",
+                      "Tips for planning a vacation.",
+                      "Strategies for starting a business."
+                    ],
+                    "correct_answer": "The importance of saving money."
+                  },
+                  {
+                    "question_id": "q2",
+                    "question_text": "What does the man suggest about managing finances?",
+                    "options": [
+                      "Avoid using credit cards entirely.",
+                      "Set aside a fixed amount each month.",
+                      "Invest all savings into real estate.",
+                      "Spend freely as long as income allows."
+                    ],
+                    "correct_answer": "Set aside a fixed amount each month."
                   }
                 ]
               },
               {
                 "part": 2,
-                "audio_url": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAA...",
+                "audio_url": "JVBERi0xLjQKJeLjz9MKMyAwIG9iago8PC9MZW5ndGggND...",
                 "questions": [
                   {
-                    "question_id": "L2",
-                    "question_text": "Where is the speaker going?",
+                    "question_id": "q3",
+                    "question_text": "What is the woman's opinion about online shopping?",
                     "options": [
-                      "A. To the park",
-                      "B. To the mall",
-                      "C. To the beach"
+                      "It is convenient but often unreliable.",
+                      "It saves time and offers great deals.",
+                      "It is harmful to small local businesses.",
+                      "It leads to unnecessary spending."
                     ],
-                    "correct_answer": "C. To the beach"
+                    "correct_answer": "It saves time and offers great deals."
                   }
                 ]
               },
               {
                 "part": 3,
-                "audio_url": "https://example.com/audio/sample3.wav",
+                "audio_url": "https://example.com/audio/listening_part3.mp3",
                 "questions": [
                   {
-                    "question_id": "L3",
-                    "question_text": "Why is the speaker late?",
+                    "question_id": "q4",
+                    "question_text": "What is the purpose of the announcement?",
                     "options": [
-                      "A. Traffic jam",
-                      "B. Lost keys",
-                      "C. Alarm didn't ring"
+                      "To promote a new product launch.",
+                      "To inform customers about store hours.",
+                      "To announce a special discount event.",
+                      "To warn about potential scams."
                     ],
-                    "correct_answer": "A. Traffic jam"
+                    "correct_answer": "To announce a special discount event."
                   }
                 ]
               }
@@ -1278,53 +1296,73 @@
             "reading": [
               {
                 "part": 1,
-                "passage_id": "R1",
-                "text": "Tung Tung Tung Sahua vs Tralalelo Tralala who will win this match.",
+                "passage_id": "passage_001",
+                "text": "The Industrial Revolution was a period of major industrialization that took place during the late 18th and early 19th centuries. It began in Great Britain and later spread to other parts of the world. The revolution introduced new manufacturing processes, including the use of machinery and steam power, which significantly increased productivity.",
                 "questions": [
                   {
-                    "question_id": "Q1",
-                    "question_text": "What is the main idea?",
-                    "options": ["A. Nature", "B. Technology", "C. History"],
-                    "correct_answer": "A. Nature"
+                    "question_id": "q5",
+                    "question_text": "What was the main cause of the Industrial Revolution?",
+                    "options": [
+                      "The discovery of electricity.",
+                      "Advancements in agricultural techniques.",
+                      "The invention of the steam engine.",
+                      "Increased demand for handmade goods."
+                    ],
+                    "correct_answer": "The invention of the steam engine."
                   }
                 ]
               },
               {
                 "part": 2,
-                "passage_id": "R2",
-                "text": "Another passage text about technology and its impact.",
+                "passage_id": "passage_002",
+                "text": "Climate change is one of the most pressing issues of our time. It refers to significant changes in global temperatures and weather patterns over time. Human activities, such as burning fossil fuels and deforestation, have been identified as major contributors to this phenomenon.",
                 "questions": [
                   {
-                    "question_id": "Q2",
-                    "question_text": "What is the author's opinion?",
-                    "options": ["A. Positive", "B. Negative", "C. Neutral"],
-                    "correct_answer": "B. Negative"
+                    "question_id": "q6",
+                    "question_text": "What is the primary effect of climate change mentioned in the passage?",
+                    "options": [
+                      "Rising sea levels.",
+                      "Increased frequency of natural disasters.",
+                      "Loss of biodiversity.",
+                      "Extreme weather conditions."
+                    ],
+                    "correct_answer": "Extreme weather conditions."
                   }
                 ]
               },
               {
                 "part": 3,
-                "passage_id": "R3",
-                "text": "Yet another passage discussing global warming.",
+                "passage_id": "passage_003",
+                "text": "Artificial intelligence (AI) is transforming industries worldwide by automating tasks, improving efficiency, and enabling new capabilities. From healthcare to transportation, AI technologies are being integrated into various sectors to solve complex problems.",
                 "questions": [
                   {
-                    "question_id": "Q3",
-                    "question_text": "What is the purpose of the text?",
-                    "options": ["A. Inform", "B. Persuade", "C. Entertain"],
-                    "correct_answer": "A. Inform"
+                    "question_id": "q7",
+                    "question_text": "What is the main advantage of AI according to the passage?",
+                    "options": [
+                      "It eliminates the need for human workers.",
+                      "It solves complex problems across industries.",
+                      "It reduces the cost of production significantly.",
+                      "It enhances creativity in artistic fields."
+                    ],
+                    "correct_answer": "It solves complex problems across industries."
                   }
                 ]
               },
               {
                 "part": 4,
-                "passage_id": "R4",
-                "text": "Final passage about the future of AI.",
+                "passage_id": "passage_004",
+                "text": "The history of the Internet dates back to the 1960s when the U.S. Department of Defense developed ARPANET, an early network designed for communication between universities and research institutions. Over time, the Internet evolved into a global system connecting billions of devices.",
                 "questions": [
                   {
-                    "question_id": "Q4",
-                    "question_text": "What is the conclusion?",
-                    "options": ["A. Success", "B. Failure", "C. Unclear"],
-                    "correct_answer": "C. Unclear"
+                    "question_id": "q8",
+                    "question_text": "What was the original purpose of the Internet?",
+                    "options": [
+                      "To provide entertainment content.",
+                      "To connect researchers and share information.",
+                      "To facilitate e-commerce transactions.",
+                      "To enable social media platforms."
+                    ],
+                    "correct_answer": "To connect researchers and share information."
                   }
                 ]
               }
@@ -1332,35 +1370,35 @@
             "writing": [
               {
                 "part": 1,
-                "prompt": "Write an essay about your goals.",
-                "sample_answer": "My goal is to become a successful engineer and contribute to society."
+                "prompt": "Write an essay discussing the impact of social media on society.",
+                "sample_answer": "Social media has revolutionized the way people communicate and share information. While it offers numerous benefits, such as connecting individuals globally, it also raises concerns about privacy and mental health."
               },
               {
                 "part": 2,
-                "prompt": "Describe your ideal job.",
-                "sample_answer": "My ideal job is one where I can help others and grow professionally."
+                "prompt": "Describe a memorable event in your life and explain why it was important.",
+                "sample_answer": "One of the most memorable events in my life was when I graduated from university. It marked the culmination of years of hard work and opened doors to new opportunities."
               }
             ],
             "speaking": [
               {
                 "part": 1,
-                "prompt": "Talk about your favorite hobby.",
-                "sample_answer": "My favorite hobby is reading books because it helps me relax."
+                "prompt": "Talk about your favorite hobby and why you enjoy it.",
+                "sample_answer": "My favorite hobby is reading because it helps me relax and expands my knowledge on various topics."
               },
               {
                 "part": 2,
-                "prompt": "Describe your last vacation.",
-                "sample_answer": "I went to the beach and had a great time with my family."
+                "prompt": "Describe a person who has influenced you positively.",
+                "sample_answer": "The person who has influenced me the most is my teacher, who always encouraged me to pursue my dreams and never give up."
               },
               {
                 "part": 3,
-                "prompt": "Explain why you like learning English.",
-                "sample_answer": "I like learning English because it helps me communicate globally."
+                "prompt": "Discuss the advantages and disadvantages of remote work.",
+                "sample_answer": "Remote work offers flexibility but can also lead to isolation and challenges in maintaining work-life balance."
               }
             ],
-            "visibility": "pending",
-            "signature": "DIGITAL_SIGNATURE_12345",
-            "attempt_count": 150
+            "visibility": "ready",
+            "signature": "abc123xyz",
+            "attempt_count": 42
           }
         ]
       }
@@ -1658,7 +1696,6 @@
 
   {
     "_id": "collection_save_user_vocabulary",
-
     "public": {
       "node_data": {
         "jsonSchema": {
