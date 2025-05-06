@@ -1,0 +1,692 @@
+[
+  {
+    "_id": "admin_collection_cards",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "AdminCardData",
+          "type": "object",
+          "properties": {
+            "_id": { "type": "string" },
+            "card_id": {
+              "type": "string",
+              "unique": true,
+              "description": "Mã định danh duy nhất của thẻ dành cho admin (định dạng AC-<ECDSA>)"
+            },
+            "user_id": {
+              "type": "string",
+              "unique": true,
+              "description": "ID người dùng (định dạng ADMIN-<UUID>)"
+            },
+            "public_key": {
+              "type": "string",
+              "description": "Khóa công khai để xác thực chữ ký số"
+            },
+            "token": { "type": "string", "required": true },
+            "qr_code": {
+              "type": "string",
+              "description": "Mã QR chứa thông tin xác thực (đã mã hóa)"
+            },
+            "signature": {
+              "type": "string",
+              "description": "Chữ ký số được tạo bởi ví của người dùng là admin "
+            },
+            "status": {
+              "type": "string",
+              "enum": ["active", "inactive", "blocked"],
+              "description": "Trạng thái thẻ"
+            },
+            "device_id": {
+              "type": "string",
+              "description": "ID của thiết bị sử dụng thẻ (nếu có).",
+              "nullable": true
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời gian tạo thẻ"
+            },
+            "hashed_adminID": {
+              "type": "string",
+              "unique": true,
+              "description": "Giá trị băm của adminID"
+            },
+            "role": {
+              "type": "string",
+              "enum": ["superadmin", "admin", "support"],
+              "description": "Vai trò của admin"
+            },
+            "permissions": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Danh sách quyền (ví dụ: ['create_card', 'delete_user'])"
+            },
+            "last_login": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời gian đăng nhập gần nhất"
+            },
+            "active_sessions": {
+              "type": "integer",
+              "default": 0,
+              "description": "Số phiên đăng nhập đang hoạt động"
+            },
+            "approval_status": {
+              "type": "string",
+              "enum": ["pending", "approved", "suspended"],
+              "default": "pending",
+              "description": "Trạng thái phê duyệt tài khoản admin"
+            },
+            "approved_by": {
+              "type": "string",
+              "nullable": true,
+              "description": "ID của admin phê duyệt tài khoản này"
+            }
+          },
+          "required": [
+            "_id",
+            "card_id",
+            "user_id",
+            "public_key",
+            "qr_code",
+            "token",
+            "status",
+            "created_at",
+            "hashed_adminID"
+          ]
+        },
+        "jsonSample": [
+          {
+            "_id": "ADMIN_CARD001",
+            "card_id": "AC123456789",
+            "user_id": "ADMIN-1a2b3c4d5e6f7890",
+            "public_key": "-BEGIN PUBLIC KEY-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...",
+            "qr_code": "https://example.com/cards/AC123456789",
+            "signature": "MEUCIQDZsVvXl9z2...c3RvbSBzaWduYXR1cmU=",
+            "status": "active",
+            "device_id": "ADMIN_DEVICE123",
+            "created_at": "2025-02-14T18:26:02.588Z",
+            "hashed_adminID": "a1b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890",
+            "role": "superadmin",
+            "permissions": ["create_card", "delete_user", "view_logs"],
+            "last_login": "2025-02-14T18:26:02.588Z",
+            "active_sessions": 2,
+            "approval_status": "approved",
+            "approved_by": "ADMIN-9876543210abcdef"
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$addFields": {
+                  "user_id": {
+                    "$function": {
+                      "body": "function() { const crypto = require('crypto'); const uuid = crypto.randomBytes(16).toString('hex'); return 'ADMIN-' + uuid; }",
+                      "args": [],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "key_pair": {
+                    "$function": {
+                      "body": "function() { const crypto = require('crypto'); const { publicKey, privateKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'secp256k1', publicKeyEncoding: { type: 'spki', format: 'pem' }, privateKeyEncoding: { type: 'pkcs8', format: 'pem' } }); return { publicKey, privateKey }; }",
+                      "args": [],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "card_id": {
+                    "$function": {
+                      "body": "function(privateKey) { const crypto = require('crypto'); const bs58 = require('bs58'); const seed = crypto.randomBytes(16); const hash = crypto.createHash('sha256').update(seed).digest(); const sign = crypto.createSign('SHA256'); sign.update(hash); sign.end(); const signature = sign.sign({ key: privateKey, format: 'pem', type: 'sec1' }, 'base64'); return 'AC-' + bs58.encode(Buffer.from(signature, 'base64')); }",
+                      "args": ["$private_key"],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "public_key": "$key_pair.publicKey",
+                  "private_key": "$key_pair.privateKey"
+                }
+              },
+              {
+                "$addFields": {
+                  "raw_qr_data": {
+                    "user_id": "$user_id",
+                    "card_id": "$card_id",
+                    "public_key": "$public_key"
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "encrypted_qr_data": {
+                    "$function": {
+                      "body": "function(data, secretKey) { const crypto = require('crypto'); const cipher = crypto.createCipher('aes-256-cbc', secretKey); let encrypted = cipher.update(JSON.stringify(data), 'utf8', 'hex'); encrypted += cipher.final('hex'); return encrypted; }",
+                      "args": ["$raw_qr_data", "jwt-secret-key"],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "signature": {
+                    "$function": {
+                      "body": "function(privateKey, qr_data) { const crypto = require('crypto'); const sign = crypto.createSign('SHA256'); sign.update(qr_data); sign.end(); return sign.sign(privateKey, 'base64'); }",
+                      "args": ["$private_key", "$encrypted_qr_data"],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "qr_code": {
+                    "$function": {
+                      "body": "function(encryptedData, sig) { return `https://example.com/cards/decrypt?data=${encodeURIComponent(encryptedData)}&signature=${encodeURIComponent(sig)}`; }",
+                      "args": ["$encrypted_qr_data", "$signature"],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+
+              {
+                "$addFields": {
+                  "hashed_adminID": {
+                    "$function": {
+                      "body": "function(input) { const crypto = require('crypto'); return crypto.createHash('sha256').update(input).digest('hex'); }",
+                      "args": ["$user_id"],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+              {
+                "$unset": ["key_pair", "private_key", "raw_qr_data"]
+              },
+              {
+                "$merge": {
+                  "into": "admin_collection_cards",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Create admin cards with user_id in ADMIN-<UUID> format and additional admin-specific fields.",
+            "data_input_from_node": [],
+            "data_output_to_node": []
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+  {
+    "_id": "login_collection",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "LoginData",
+          "type": "object",
+          "properties": {
+            "_id": { "type": "string" },
+            "user_id": {
+              "type": "string",
+              "description": "ID người dùng (ADMIN-UUID)"
+            },
+            "card_id": {
+              "type": "string",
+              "description": "Mã định danh duy nhất của thẻ dành cho admin (định dạng AC-<ECDSA>)"
+            },
+            "token": {
+              "type": "string",
+              "unique": true,
+              "description": "Token phiên (JWT hoặc UUID)"
+            },
+            "expires_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời gian hết hạn của token"
+            },
+            "last_login": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời gian đăng nhập gần nhất"
+            }
+          },
+          "required": ["user_id", "card_id", "token", "expires_at"]
+        },
+        "jsonSample": [
+          {
+            "_id": "LOGIN_001",
+            "user_id": "ADMIN-1a2b3c4d5e6f7890",
+            "card_id": "AC123456789",
+            "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xxxxx",
+            "expires_at": "2025-02-14T19:26:02.588Z",
+            "last_login": "2025-02-14T18:26:02.588Z"
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$lookup": {
+                  "from": "admin_collection_cards",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "admin_data"
+                }
+              },
+              {
+                "$unwind": "$admin_data"
+              },
+              {
+                "$match": {
+                  "$expr": {
+                    "$and": [
+                      { "$eq": ["$card_id", "$admin_data.card_id"] },
+                      { "$eq": ["$public_key", "$admin_data.public_key"] },
+                      { "$eq": ["$signature", "$admin_data.signature"] }
+                    ]
+                  }
+                }
+              },
+
+              {
+                "$addFields": {
+                  "token": {
+                    "$function": {
+                      "body": "function() { const crypto = require('crypto'); return crypto.randomBytes(32).toString('hex'); }",
+                      "args": [],
+                      "lang": "js"
+                    }
+                  },
+                  "expires_at": {
+                    "$dateAdd": {
+                      "startDate": "$$NOW",
+                      "unit": "hour",
+                      "amount": 1
+                    }
+                  }
+                }
+              },
+
+              {
+                "$merge": {
+                  "into": "login_collection",
+                  "on": "_id",
+                  "whenMatched": "replace",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Xác thực người dùng và tạo token đăng nhập ngắn hạn",
+            "data_input_from_node": [
+              "user_id",
+              "card_id",
+              "public_key",
+              "signature"
+            ],
+            "data_output_to_node": ["token", "expires_at"]
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+  {
+    "_id": "collection_tests",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "UnifiedTestSchema",
+          "type": "object",
+          "properties": {
+            "_id": { "type": "string" },
+            "card_id": {
+              "type": "string",
+              "unique": true,
+              "description": "Mã định danh duy nhất của thẻ dành cho admin (định dạng AC-<ECDSA>)"
+            },
+            "user_id": {
+              "type": "string",
+              "unique": true,
+              "description": "ID người dùng (định dạng ADMIN-<UUID>)"
+            },
+            "signature": {
+              "type": "string",
+              "description": "Chữ ký số được tạo bởi ví của người dùng là admin"
+            },
+            "test_id": { "type": "string" },
+            "test_type": { "type": "string", "enum": ["listening", "reading"] },
+            "level": {
+              "type": "string",
+              "enum": ["B1", "B2", "C1"]
+            }
+          },
+          "required": ["_id", "test_id", "test_type"],
+          "allOf": [
+            {
+              "if": { "properties": { "test_type": { "const": "listening" } } },
+              "then": {
+                "properties": {
+                  "audio_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "URL của file audio. Trường này chứa URL của file audio, dù là từ upload hoặc nhập trực tiếp."
+                  },
+                  "questions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "question_id": { "type": "string" },
+                        "question_text": { "type": "string" },
+                        "options": {
+                          "type": "array",
+                          "items": { "type": "string" },
+                          "minItems": 4,
+                          "maxItems": 4
+                        },
+                        "correct_answer": { "type": "string" }
+                      },
+                      "required": [
+                        "question_id",
+                        "question_text",
+                        "options",
+                        "correct_answer",
+                        "audio_url"
+                      ]
+                    }
+                  }
+                },
+                "required": ["audio_url", "questions"]
+              }
+            },
+            {
+              "if": { "properties": { "test_type": { "const": "reading" } } },
+              "then": {
+                "properties": {
+                  "instructions": { "type": "string" },
+                  "passages": {
+                    "type": "array",
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "passage_id": { "type": "string" },
+                        "question_text": { "type": "string" },
+                        "questions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "question_id": { "type": "string" },
+                              "question_type": {
+                                "type": "string",
+                                "enum": ["multiple_choice", "short_answer"]
+                              },
+                              "text": { "type": "string" },
+                              "options": {
+                                "type": "array",
+                                "items": { "type": "string" },
+                                "minItems": 4,
+                                "maxItems": 4
+                              },
+                              "correct_answer": { "type": "string" }
+                            },
+                            "required": [
+                              "question_id",
+                              "question_type",
+                              "text",
+                              "correct_answer"
+                            ],
+                            "allOf": [
+                              {
+                                "if": {
+                                  "properties": {
+                                    "question_type": {
+                                      "const": "multiple_choice"
+                                    }
+                                  }
+                                },
+                                "then": {
+                                  "required": ["options", "correct_answer"]
+                                }
+                              },
+                              {
+                                "if": {
+                                  "properties": {
+                                    "question_type": { "const": "short_answer" }
+                                  }
+                                },
+                                "then": { "required": ["correct_answer"] }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": ["passage_id", "question_text", "questions"]
+                    }
+                  }
+                },
+                "required": ["level", "instructions", "passages"]
+              }
+            }
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$lookup": {
+                  "from": "admin_collection_cards",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "admin_data"
+                }
+              },
+              {
+                "$unwind": "$admin_data"
+              },
+              {
+                "$match": {
+                  "$expr": {
+                    "$and": [
+                      { "$eq": ["$card_id", "$admin_data.card_id"] },
+                      { "$eq": ["$user_id", "$admin_data.user_id"] }
+                    ]
+                  }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "login_collection",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "login_data"
+                }
+              },
+              {
+                "$unwind": "$login_data"
+              },
+              {
+                "$match": {
+                  "$expr": {
+                    "$and": [
+                      { "$eq": ["$card_id", "$login_data.card_id"] },
+                      { "$gte": ["$$NOW", "$login_data.expires_at"] }
+                    ]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "data_to_sign": {
+                    "test_id": "$test_id",
+                    "test_type": "$test_type",
+                    "level": "$level"
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "is_signature_valid": {
+                    "$function": {
+                      "body": "function(publicKey, data, signature) { const crypto = require('crypto'); const verify = crypto.createVerify('SHA256'); verify.update(JSON.stringify(data)); verify.end(); return verify.verify(publicKey, signature, 'base64'); }",
+                      "args": [
+                        "$admin_data.public_key",
+                        "$data_to_sign",
+                        "$signature"
+                      ],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "is_signature_valid": true
+                }
+              },
+              {
+                "$project": {
+                  "data_to_sign": 0,
+                  "admin_data": 0,
+                  "login_data": 0,
+                  "is_signature_valid": 0
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_tests",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Xác thực card_id, user_id, signature trong admin_collection_cards và kiểm tra token trong login_collection trước khi lưu bài kiểm tra",
+            "data_input_from_node": [
+              "collection_tests",
+              "admin_collection_cards",
+              "login_collection"
+            ],
+            "data_output_to_node": "collection_tests"
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "test_type": "listening"
+                }
+              },
+              {
+                "$addFields": {
+                  "is_upload": {
+                    "$cond": {
+                      "if": { "$ne": ["$audio_url", null] },
+                      "then": true,
+                      "else": false
+                    }
+                  }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "uploads",
+                  "localField": "audio_url",
+                  "foreignField": "_id",
+                  "as": "uploaded_audio_info"
+                }
+              },
+              {
+                "$addFields": {
+                  "processed_audio_url": {
+                    "$cond": {
+                      "if": "$is_upload",
+                      "then": {
+                        "$arrayElemAt": ["$uploaded_audio_info.url", 0]
+                      },
+                      "else": "$audio_url"
+                    }
+                  }
+                }
+              },
+              {
+                "$project": {
+                  "audio_url": "$processed_audio_url",
+                  "questions": 1,
+                  "test_id": 1,
+                  "test_type": 1,
+                  "level": 1
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_tests",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Pipeline xử lý logic lưu trữ audio_url: nếu user upload file thì băm ra URL, nếu user cung cấp URL thì lưu trực tiếp.",
+            "data_input_from_node": ["collection_tests", "uploads"],
+            "data_output_to_node": "collection_tests"
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  }
+]
