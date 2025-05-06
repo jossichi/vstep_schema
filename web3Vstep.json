@@ -34,7 +34,7 @@
             },
             "status": {
               "type": "string",
-              "enum": ["active", "inactive", "blocked"],
+              "enum": ["active", "blocked"],
               "description": "Trạng thái thẻ"
             },
             "device_id": {
@@ -186,6 +186,149 @@
   },
 
   {
+    "_id": "blocked_cards",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "BlockedCardSchema",
+          "type": "object",
+          "properties": {
+            "_id": { "type": "string" },
+            "card_id": {
+              "type": "string",
+              "description": "Tham chiếu đến `card_id` trong `collection_cards`"
+            },
+            "user_id": {
+              "type": "string",
+              "description": "Tham chiếu đến `user_id` trong `collection_cards`"
+            },
+            "reason": {
+              "type": "string",
+              "description": "Lý do bị chặn (do admin nhập)"
+            },
+            "blocked_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời gian bị chặn"
+            },
+            "unblock_date": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời hạn gỡ chặn (nếu có)"
+            }
+          },
+          "required": ["_id", "card_id", "user_id", "reason", "blocked_at"]
+        },
+        "jsonSample": [
+          {
+            "_id": "BLOCKED_001",
+            "card_id": "C123456789",
+            "user_id": "USER123",
+            "reason": "Vi phạm chính sách sử dụng",
+            "blocked_at": "2025-02-14T18:26:02.588Z",
+            "unblock_date": "2025-03-14T18:26:02.588Z"
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "card_id",
+                  "foreignField": "card_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_data"
+                }
+              },
+              {
+                "$unwind": "$user_data"
+              },
+
+              {
+                "$lookup": {
+                  "from": "admin_blocked_cards",
+                  "localField": "card_id",
+                  "foreignField": "card_id",
+                  "as": "admin_block_info"
+                }
+              },
+              {
+                "$unwind": "$admin_block_info"
+              },
+              {
+                "$match": {
+                  "$expr": {
+                    "$and": [
+                      { "$eq": ["$card_id", "$admin_block_info.card_id"] },
+                      { "$eq": ["$user_id", "$admin_block_info.user_id"] },
+                      { "$eq": ["$admin_block_info.status", "blocked"] }
+                    ]
+                  }
+                }
+              },
+
+              {
+                "$addFields": {
+                  "reason": "$reason_input",
+                  "blocked_at": "$$NOW",
+                  "unblock_date": {
+                    "$cond": {
+                      "if": { "$ne": ["$unblock_date_input", null] },
+                      "then": "$unblock_date_input",
+                      "else": null
+                    }
+                  }
+                }
+              },
+
+              {
+                "$project": {
+                  "admin_block_info": 0,
+                  "card_data": 0,
+                  "user_data": 0
+                }
+              },
+
+              {
+                "$merge": {
+                  "into": "blocked_cards",
+                  "on": "_id",
+                  "whenMatched": "replace",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Lưu trữ thông tin chặn thẻ người dùng mà không lưu thông tin admin",
+            "data_input_from_node": [
+              "card_id",
+              "user_id",
+              "reason_input",
+              "unblock_date_input"
+            ],
+            "data_output_to_node": ["blocked_at", "unblock_date"]
+          }
+        ]
+      }
+    }
+  },
+
+  {
     "_id": "collection_user_login",
     "public": {
       "node_data": {
@@ -240,6 +383,70 @@
     "private": {
       "node_function": {
         "edge": [
+          {
+            "pipeline": [
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "card_id",
+                  "foreignField": "card_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_data"
+                }
+              },
+              {
+                "$unwind": "$user_data"
+              },
+
+              {
+                "$lookup": {
+                  "from": "blocked_cards",
+                  "localField": "card_id",
+                  "foreignField": "card_id",
+                  "as": "blocked_info"
+                }
+              },
+              {
+                "$addFields": {
+                  "active_block": {
+                    "$filter": {
+                      "input": "$blocked_info",
+                      "cond": {
+                        "$and": [
+                          { "$eq": ["$$this.user_id", "$user_id"] },
+                          {
+                            "$or": [
+                              { "$gte": ["$$this.unblock_date", "$$NOW"] },
+                              { "$eq": ["$$this.unblock_date", null] }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "active_block.0": { "$exists": false }
+                }
+              }
+            ],
+            "purpose": "Kiểm tra người dùng có bị chặn không dựa trên card_id và user_id",
+            "data_input_from_node": ["card_id", "user_id"],
+            "data_output_to_node": ["active_block"]
+          },
+
           {
             "pipeline": [
               {
@@ -331,7 +538,7 @@
                 }
               }
             ],
-            "purpose": "Tạo token, quản lý user, và ghi log đăng nhập vào collection_user_all",
+            "purpose": "Tạo token, quản lý user, và ghi log đăng nhập nếu người dùng không bị chặn",
             "data_input_from_node": ["collection_user_login"],
             "data_output_to_node": "collection_user_all"
           }
