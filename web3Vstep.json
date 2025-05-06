@@ -565,17 +565,17 @@
           "type": "object",
           "properties": {
             "_id": { "type": "string" },
-            "card_id": {
+            "admin_card_id": {
               "type": "string",
               "unique": true,
               "description": "Mã định danh duy nhất của thẻ dành cho admin (định dạng AC-<ECDSA>)"
             },
-            "user_id": {
+            "admin_id": {
               "type": "string",
               "unique": true,
               "description": "ID người dùng (định dạng ADMIN-<UUID>)"
             },
-            "signature": {
+            "admin_signature": {
               "type": "string",
               "description": "Chữ ký số được tạo bởi ví của người dùng là admin"
             },
@@ -709,6 +709,78 @@
               {
                 "$lookup": {
                   "from": "admin_collection_cards",
+                  "localField": "admin_id",
+                  "foreignField": "user_id",
+                  "as": "admin_data"
+                }
+              },
+              {
+                "$unwind": "$admin_data"
+              },
+              {
+                "$match": {
+                  "$expr": {
+                    "$eq": ["$admin_card_id", "$admin_data.card_id"]
+                  }
+                }
+              },
+
+              {
+                "$addFields": {
+                  "data_to_sign": {
+                    "test_id": "$test_id",
+                    "test_type": "$test_type"
+                  }
+                }
+              },
+
+              {
+                "$addFields": {
+                  "is_signature_valid": {
+                    "$function": {
+                      "body": "function(publicKey, data, signature) { const crypto = require('crypto'); const verify = crypto.createVerify('SHA256'); verify.update(JSON.stringify(data)); verify.end(); return verify.verify(publicKey, signature, 'base64'); }",
+                      "args": [
+                        "$admin_data.public_key",
+                        "$data_to_sign",
+                        "$admin_signature"
+                      ],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "is_signature_valid": true
+                }
+              },
+
+              {
+                "$addFields": {
+                  "has_permission": {
+                    "$in": ["create_test", "$admin_data.permissions"]
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "has_permission": true
+                }
+              }
+            ],
+            "purpose": "Xác thực admin_card_id, admin_id, admin_signature trong admin_collection_cards trước khi lưu bài kiểm tra",
+            "data_input_from_node": [
+              "admin_card_id",
+              "admin_id",
+              "admin_signature"
+            ],
+            "data_output_to_node": "collection_tests"
+          },
+          {
+            "pipeline": [
+              {
+                "$lookup": {
+                  "from": "admin_collection_cards",
                   "localField": "user_id",
                   "foreignField": "user_id",
                   "as": "admin_data"
@@ -759,13 +831,13 @@
               },
               {
                 "$addFields": {
-                  "is_signature_valid": {
+                  "is_admin_signature_valid": {
                     "$function": {
-                      "body": "function(publicKey, data, signature) { const crypto = require('crypto'); const verify = crypto.createVerify('SHA256'); verify.update(JSON.stringify(data)); verify.end(); return verify.verify(publicKey, signature, 'base64'); }",
+                      "body": "function(publicKey, data, admin_signature) { const crypto = require('crypto'); const verify = crypto.createVerify('SHA256'); verify.update(JSON.stringify(data)); verify.end(); return verify.verify(publicKey, admin_signature, 'base64'); }",
                       "args": [
                         "$admin_data.public_key",
                         "$data_to_sign",
-                        "$signature"
+                        "$admin_signature"
                       ],
                       "lang": "js"
                     }
@@ -774,7 +846,7 @@
               },
               {
                 "$match": {
-                  "is_signature_valid": true
+                  "is_admin_signature_valid": true
                 }
               },
               {
@@ -782,7 +854,7 @@
                   "data_to_sign": 0,
                   "admin_data": 0,
                   "login_data": 0,
-                  "is_signature_valid": 0
+                  "is_admin_signature_valid": 0
                 }
               },
               {
@@ -794,7 +866,7 @@
                 }
               }
             ],
-            "purpose": "Xác thực card_id, user_id, signature trong admin_collection_cards và kiểm tra token trong login_collection trước khi lưu bài kiểm tra",
+            "purpose": "Xác thực card_id, user_id, admin_signature trong admin_collection_cards và kiểm tra token trong login_collection trước khi lưu bài kiểm tra",
             "data_input_from_node": [
               "collection_tests",
               "admin_collection_cards",
