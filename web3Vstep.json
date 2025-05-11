@@ -325,6 +325,14 @@
           }
         ]
       }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
     }
   },
 
@@ -1308,62 +1316,6 @@
                   "whenMatched": "merge",
                   "whenNotMatched": "insert"
                 }
-              },
-              {
-                "pipeline": [
-                  {
-                    "$match": {
-                      "post_test_actions": "upload_test",
-                      "is_completed": true,
-                      "avg_score": { "$exists": true }
-                    }
-                  },
-                  {
-                    "$addFields": {
-                      "can_post_materials": {
-                        "$cond": {
-                          "if": { "$gte": ["$avg_score", 5] },
-                          "then": true,
-                          "else": false
-                        }
-                      },
-                      "daily_upload_count": {
-                        "$cond": {
-                          "if": { "$eq": [{ "$size": "$user_uploads" }, 0] },
-                          "then": 0,
-                          "else": {
-                            "$arrayElemAt": [
-                              "$user_uploads.daily_upload_count",
-                              -1
-                            ]
-                          }
-                        }
-                      }
-                    }
-                  },
-                  {
-                    "$match": {
-                      "daily_upload_count": { "$lt": 3 }
-                    }
-                  },
-                  {
-                    "$merge": {
-                      "into": "collection_practice_materials",
-                      "on": "test_id",
-                      "whenMatched": "keepExisting",
-                      "whenNotMatched": {
-                        "$set": {
-                          "user_id": "$user_id",
-                          "upload_date": "$$NOW",
-                          "visibility": "pending"
-                        }
-                      }
-                    }
-                  }
-                ],
-                "purpose": "Xử lý đăng bài kiểm tra của người dùng.",
-                "data_input_from_node": ["collection_user_tests"],
-                "data_output_to_node": "collection_practice_materials"
               }
             ],
             "purpose": "Tính điểm bài test của người dùng, xác định trình độ mới dựa trên điểm trung bình, và cập nhật vào collection_user_tests.",
@@ -1372,6 +1324,59 @@
               "collection_tests"
             ],
             "data_output_to_node": "collection_user_tests"
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "post_test_actions": "upload_test",
+                  "is_completed": true,
+                  "avg_score": { "$exists": true }
+                }
+              },
+              {
+                "$addFields": {
+                  "can_post_materials": {
+                    "$cond": {
+                      "if": { "$gte": ["$avg_score", 5] },
+                      "then": true,
+                      "else": false
+                    }
+                  },
+                  "daily_upload_count": {
+                    "$cond": {
+                      "if": { "$eq": [{ "$size": "$user_uploads" }, 0] },
+                      "then": 0,
+                      "else": {
+                        "$arrayElemAt": ["$user_uploads.daily_upload_count", -1]
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "daily_upload_count": { "$lt": 3 }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_practice_materials",
+                  "on": "test_id",
+                  "whenMatched": "keepExisting",
+                  "whenNotMatched": {
+                    "$set": {
+                      "user_id": "$user_id",
+                      "upload_date": "$$NOW",
+                      "visibility": "pending"
+                    }
+                  }
+                }
+              }
+            ],
+            "purpose": "Xử lý đăng bài kiểm tra của người dùng.",
+            "data_input_from_node": ["collection_user_tests"],
+            "data_output_to_node": "collection_practice_materials"
           },
           {
             "pipeline": [
@@ -1914,7 +1919,14 @@
                   "material_id": {
                     "$cond": {
                       "if": { "$eq": ["$material_id", null] },
-                      "then": { "$toString": { "$uuid": "" } },
+                      "then": {
+                        "$function": {
+                          "body": "function() { return require('crypto').randomUUID(); }",
+                          "args": [],
+                          "lang": "js"
+                        }
+                      },
+
                       "else": "$material_id"
                     }
                   }
@@ -2091,6 +2103,14 @@
             "data_output_to_node": ["collection_practice_materials"]
           }
         ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
       }
     }
   },
@@ -2409,13 +2429,10 @@
                 }
               },
               {
-                "$out": "temp_deleted_vocab"
-              },
-              {
                 "$merge": {
-                  "into": "collection_save_user_vocabulary",
-                  "whenMatched": "fail",
-                  "whenNotMatched": "discard"
+                  "into": "temp_deleted_vocab",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
                 }
               }
             ],
@@ -2424,6 +2441,14 @@
             "data_output_to_node": ["temp_deleted_vocab"]
           }
         ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
       }
     }
   },
@@ -2747,6 +2772,14 @@
             "data_output_to_node": ["collection_materials_user_done"]
           }
         ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
       }
     }
   },
@@ -3264,6 +3297,14 @@
           }
         ]
       }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
     }
   },
 
@@ -3311,6 +3352,14 @@
             "description": "Discuss how technology has changed the way we live, work, and communicate."
           }
         ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
       }
     }
   },
@@ -3512,6 +3561,14 @@
             "data_output_to_node": []
           }
         ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
       }
     }
   },
@@ -4238,6 +4295,460 @@
             "purpose": "Hủy tư cách Elite Partner nếu không trụ hạng trong top 10 trong 3 tuần liên tiếp",
             "data_input_from_node": ["elite_partners"],
             "data_output_to_node": []
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+
+  {
+    "_id": "matching_elite_learner",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "title": "MatchingLogData",
+          "type": "object",
+          "properties": {
+            "_id": { "type": "string" },
+            "elite_id": {
+              "type": "string",
+              "description": "ID của Elite Partner."
+            },
+            "learner_id": {
+              "type": "string",
+              "description": "ID của Learner."
+            },
+            "matched_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời điểm ghép cặp."
+            },
+            "end_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời điểm kết thúc mối quan hệ matching."
+            },
+            "status": {
+              "type": "string",
+              "enum": ["pending", "active", "terminated"],
+              "description": "Trạng thái của mối quan hệ matching."
+            },
+            "log": {
+              "type": "object",
+              "properties": {
+                "elite_rank": {
+                  "type": "integer",
+                  "description": "Thứ hạng của Elite Partner."
+                },
+                "learner_rank": {
+                  "type": "integer",
+                  "description": "Thứ hạng của Learner."
+                }
+              }
+            }
+          },
+          "required": [
+            "_id",
+            "elite_id",
+            "learner_id",
+            "matched_at",
+            "end_at",
+            "status",
+            "log"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "status": "active",
+                  "is_elite_partner": true
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "leaderboard",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "leaderboard_data"
+                }
+              },
+              {
+                "$unwind": "$leaderboard_data"
+              },
+              {
+                "$addFields": {
+                  "elite_rank": "$leaderboard_data.rank"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "leaderboard",
+                  "let": { "elite_rank": "$elite_rank" },
+                  "pipeline": [
+                    {
+                      "$match": {
+                        "$expr": {
+                          "$and": [
+                            { "$gt": ["$rank", "$$elite_rank"] },
+                            { "$lte": ["$rank", 20] }
+                          ]
+                        }
+                      }
+                    }
+                  ],
+                  "as": "eligible_learners"
+                }
+              },
+              {
+                "$unwind": "$eligible_learners"
+              },
+              {
+                "$lookup": {
+                  "from": "matching_logs",
+                  "localField": "user_id",
+                  "foreignField": "elite_id",
+                  "as": "existing_matches"
+                }
+              },
+              {
+                "$addFields": {
+                  "current_match_count": { "$size": "$existing_matches" }
+                }
+              },
+              {
+                "$match": {
+                  "current_match_count": { "$lt": 3 }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "matching_logs",
+                  "localField": "eligible_learners.user_id",
+                  "foreignField": "learner_id",
+                  "as": "learner_existing_matches"
+                }
+              },
+              {
+                "$match": {
+                  "learner_existing_matches": { "$size": 0 }
+                }
+              },
+              {
+                "$addFields": {
+                  "learner_id": "$eligible_learners.user_id",
+                  "learner_rank": "$eligible_learners.rank",
+                  "matched_at": "$$NOW",
+                  "end_at": {
+                    "$dateAdd": {
+                      "startDate": "$$NOW",
+                      "unit": "week",
+                      "amount": 1
+                    }
+                  },
+                  "status": "active"
+                }
+              },
+              {
+                "$project": {
+                  "_id": 0,
+                  "elite_id": "$user_id",
+                  "learner_id": 1,
+                  "matched_at": 1,
+                  "end_at": 1,
+                  "status": 1,
+                  "log": {
+                    "elite_rank": "$elite_rank",
+                    "learner_rank": "$learner_rank"
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "matching_logs",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Pipeline for automatically matching Elite Partners with Learners based on rank and status.",
+            "data_input_from_node": [
+              "elite_partners",
+              "leaderboard",
+              "matching_logs"
+            ],
+            "data_output_to_node": "matching_logs"
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+  {
+    "_id": "supporting_feedback",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "SupportingFeedbackData",
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "description": "The unique identifier of the document in MongoDB."
+            },
+            "matching_id": {
+              "type": "string",
+              "description": "ID của mối quan hệ matching (tham chiếu đến collection matching_logs)."
+            },
+            "elite_id": {
+              "type": "string",
+              "description": "ID của Elite Partner."
+            },
+            "learner_id": {
+              "type": "string",
+              "description": "ID của Learner."
+            },
+            "practice_results": {
+              "type": "object",
+              "properties": {
+                "listening_score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "description": "Điểm kỹ năng nghe."
+                },
+                "reading_score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "description": "Điểm kỹ năng đọc."
+                },
+                "writing_score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "description": "Điểm kỹ năng viết."
+                },
+                "speaking_score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100,
+                  "description": "Điểm kỹ năng nói."
+                }
+              },
+              "description": "Kết quả luyện tập của Learner từ collection_user_practice_results."
+            },
+            "completed_materials": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "material_id": {
+                    "type": "string",
+                    "description": "ID của đề ôn tập đã hoàn thành."
+                  },
+                  "section": {
+                    "type": "string",
+                    "enum": ["listening", "reading", "writing", "speaking"],
+                    "description": "Kỹ năng thi đã hoàn thành."
+                  },
+                  "part": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 4,
+                    "description": "Phần thi đã hoàn thành."
+                  },
+                  "score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Điểm số của phần thi."
+                  }
+                },
+                "required": ["material_id", "section", "part", "score"]
+              },
+              "description": "Danh sách các đề ôn tập đã hoàn thành bởi Learner từ collection_materials_user_done."
+            },
+            "feedback": {
+              "type": "object",
+              "properties": {
+                "comments": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Các nhận xét của Elite Partner về kết quả của Learner."
+                },
+                "suggestions": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Các gợi ý cải thiện từ Elite Partner."
+                }
+              },
+              "required": ["comments", "suggestions"]
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời điểm tạo feedback."
+            }
+          },
+          "required": [
+            "_id",
+            "matching_id",
+            "elite_id",
+            "learner_id",
+            "practice_results",
+            "completed_materials",
+            "feedback",
+            "created_at"
+          ],
+          "additionalProperties": false
+        },
+        "jsonSample": [
+          {
+            "_id": "feedback_001",
+            "matching_id": "match_001",
+            "elite_id": "ELITE_001",
+            "learner_id": "USER_LB_003",
+            "practice_results": {
+              "listening_score": 85,
+              "reading_score": 78,
+              "writing_score": 80,
+              "speaking_score": 90
+            },
+            "completed_materials": [
+              {
+                "material_id": "mat_001",
+                "section": "listening",
+                "part": 1,
+                "score": 90
+              },
+              {
+                "material_id": "mat_002",
+                "section": "reading",
+                "part": 2,
+                "score": 85
+              }
+            ],
+            "feedback": {
+              "comments": [
+                "Learner có kỹ năng nghe rất tốt nhưng cần cải thiện phần đọc hiểu.",
+                "Phần nói rất tự tin và rõ ràng."
+              ],
+              "suggestions": [
+                "Hãy luyện tập thêm về ngữ pháp trong phần viết.",
+                "Cố gắng đọc nhiều văn bản tiếng Anh hơn để cải thiện vốn từ vựng."
+              ]
+            },
+            "created_at": "2025-02-16T12:00:00.000Z"
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "status": "active"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_user_practice_results",
+                  "localField": "learner_id",
+                  "foreignField": "user_id",
+                  "as": "practice_results"
+                }
+              },
+              {
+                "$unwind": "$practice_results"
+              },
+              {
+                "$lookup": {
+                  "from": "collection_materials_user_done",
+                  "localField": "learner_id",
+                  "foreignField": "user_id",
+                  "as": "completed_materials"
+                }
+              },
+              {
+                "$addFields": {
+                  "practice_results": {
+                    "listening_score": "$practice_results.skill_scores.listening.total",
+                    "reading_score": "$practice_results.skill_scores.reading.total",
+                    "writing_score": "$practice_results.skill_scores.writing.total",
+                    "speaking_score": "$practice_results.skill_scores.speaking.total"
+                  },
+                  "completed_materials": {
+                    "$map": {
+                      "input": "$completed_materials",
+                      "as": "material",
+                      "in": {
+                        "material_id": "$$material.material_id",
+                        "section": "$$material.section",
+                        "part": "$$material.part",
+                        "score": "$$material.score"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$project": {
+                  "_id": 0,
+                  "matching_id": "$_id",
+                  "elite_id": "$elite_id",
+                  "learner_id": "$learner_id",
+                  "practice_results": 1,
+                  "completed_materials": 1,
+                  "feedback": {
+                    "comments": [],
+                    "suggestions": []
+                  },
+                  "created_at": "$$NOW"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "supporting_feedback",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Pipeline for creating supporting feedback based on practice results and completed materials.",
+            "data_input_from_node": [
+              "matching_logs",
+              "collection_user_practice_results",
+              "collection_materials_user_done"
+            ],
+            "data_output_to_node": "supporting_feedback"
           }
         ]
       }
