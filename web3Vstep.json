@@ -1452,780 +1452,775 @@
     }
   },
 
-  [
-    {
-      "_id": "collection_practice_materials",
-      "public": {
-        "node_data": {
-          "jsonSchema": {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "title": "PracticeMaterialData",
-            "type": "object",
-            "properties": {
-              "_id": {
-                "type": "string",
-                "description": "The unique identifier of the document in MongoDB."
-              },
-              "user_id": {
-                "type": "string",
+  {
+    "_id": "collection_practice_materials",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "PracticeMaterialData",
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "description": "The unique identifier of the document in MongoDB."
+            },
+            "user_id": {
+              "type": "string",
 
-                "description": "ID người dùng sở hữu thẻ"
-              },
-              "material_id": {
-                "type": "string",
-                "description": "The unique material identifier."
-              },
-              "upload_date": {
-                "type": "string",
-                "format": "date-time",
-                "description": "The timestamp when the practice material was uploaded."
-              },
-              "level": {
-                "type": "string",
-                "enum": ["B1", "B2", "C1", "C2"],
-                "description": "The difficulty level of the practice material."
-              },
-              "listening": {
-                "type": "array",
-                "minItems": 3,
-                "maxItems": 3,
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "part": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 3
-                    },
-                    "audio_url": {
-                      "type": "string",
-                      "description": "Either a Base64-encoded audio file or a URL pointing to an audio file.",
-                      "oneOf": [{ "format": "base64" }, { "format": "uri" }]
-                    },
-                    "questions": {
-                      "type": "array",
-                      "minItems": 1,
-                      "maxItems": 15,
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "question_id": { "type": "string" },
-                          "question_text": { "type": "string" },
-                          "options": {
-                            "type": "array",
-                            "minItems": 3,
-                            "maxItems": 5,
-                            "items": { "type": "string" }
-                          },
-                          "correct_answer": { "type": "string" }
+              "description": "ID người dùng sở hữu thẻ"
+            },
+            "material_id": {
+              "type": "string",
+              "description": "The unique material identifier."
+            },
+            "upload_date": {
+              "type": "string",
+              "format": "date-time",
+              "description": "The timestamp when the practice material was uploaded."
+            },
+            "level": {
+              "type": "string",
+              "enum": ["B1", "B2", "C1", "C2"],
+              "description": "The difficulty level of the practice material."
+            },
+            "listening": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "part": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3
+                  },
+                  "audio_url": {
+                    "type": "string",
+                    "description": "Either a Base64-encoded audio file or a URL pointing to an audio file.",
+                    "oneOf": [{ "format": "base64" }, { "format": "uri" }]
+                  },
+                  "questions": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 15,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "question_id": { "type": "string" },
+                        "question_text": { "type": "string" },
+                        "options": {
+                          "type": "array",
+                          "minItems": 3,
+                          "maxItems": 5,
+                          "items": { "type": "string" }
                         },
-                        "required": [
-                          "question_id",
-                          "question_text",
-                          "options",
-                          "correct_answer"
-                        ]
-                      }
+                        "correct_answer": { "type": "string" }
+                      },
+                      "required": [
+                        "question_id",
+                        "question_text",
+                        "options",
+                        "correct_answer"
+                      ]
                     }
-                  },
-                  "required": ["part", "audio_url", "questions"]
-                }
-              },
-              "reading": {
-                "type": "array",
-                "minItems": 4,
-                "maxItems": 4,
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "part": { "type": "integer", "minimum": 1, "maximum": 4 },
-                    "passage_id": { "type": "string" },
-                    "text": { "type": "string" },
-                    "questions": {
-                      "type": "array",
-                      "minItems": 1,
-                      "maxItems": 15,
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "question_id": { "type": "string" },
-                          "question_text": { "type": "string" },
-                          "options": {
-                            "type": "array",
-                            "minItems": 3,
-                            "maxItems": 5,
-                            "items": { "type": "string" }
-                          },
-                          "correct_answer": { "type": "string" }
-                        },
-                        "required": [
-                          "question_id",
-                          "question_text",
-                          "options",
-                          "correct_answer"
-                        ]
-                      }
-                    }
-                  },
-                  "required": ["part", "passage_id", "text", "questions"]
-                }
-              },
-              "writing": {
-                "type": "array",
-                "minItems": 2,
-                "maxItems": 2,
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "part": { "type": "integer", "minimum": 1, "maximum": 2 },
-                    "prompt": { "type": "string" },
-                    "sample_answer": { "type": "string" }
-                  },
-                  "required": ["part", "prompt", "sample_answer"]
-                }
-              },
-              "speaking": {
-                "type": "array",
-                "minItems": 3,
-                "maxItems": 3,
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "part": { "type": "integer", "minimum": 1, "maximum": 3 },
-                    "prompt": { "type": "string" },
-                    "sample_answer": { "type": "string" }
-                  },
-                  "required": ["part", "prompt", "sample_answer"]
-                }
-              },
-              "visibility": {
-                "type": "string",
-                "enum": ["pending", "ready", "rejected"],
-                "description": "The visibility status of the material: pending, ready, or rejected."
-              },
-              "signature": {
-                "type": "string",
-                "description": "Digital signature to verify authorship."
-              },
-              "attempt_count": {
-                "type": "integer",
-                "minimum": 0,
-                "description": "The number of times users have attempted this practice material."
+                  }
+                },
+                "required": ["part", "audio_url", "questions"]
               }
             },
-            "required": [
-              "_id",
-              "user_id",
-              "material_id",
-              "upload_date",
-              "level",
-              "listening",
-              "reading",
-              "writing",
-              "speaking",
-              "visibility",
-              "signature",
-              "attempt_count"
-            ],
-            "additionalProperties": false
-          },
-          "jsonSample": [
-            {
-              "_id": "material_001",
-              "user_id": "user_12345",
-              "material_id": "mat_67890",
-              "upload_date": "2023-10-15T14:35:00Z",
-              "level": "B2",
-              "listening": [
-                {
-                  "part": 1,
-                  "audio_url": "https://example.com/audio/listening_part1.mp3",
-                  "questions": [
-                    {
-                      "question_id": "q1",
-                      "question_text": "What is the main topic of the conversation?",
-                      "options": [
-                        "The importance of saving money.",
-                        "How to invest in stocks.",
-                        "Tips for planning a vacation.",
-                        "Strategies for starting a business."
-                      ],
-                      "correct_answer": "The importance of saving money."
-                    },
-                    {
-                      "question_id": "q2",
-                      "question_text": "What does the man suggest about managing finances?",
-                      "options": [
-                        "Avoid using credit cards entirely.",
-                        "Set aside a fixed amount each month.",
-                        "Invest all savings into real estate.",
-                        "Spend freely as long as income allows."
-                      ],
-                      "correct_answer": "Set aside a fixed amount each month."
+            "reading": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "part": { "type": "integer", "minimum": 1, "maximum": 4 },
+                  "passage_id": { "type": "string" },
+                  "text": { "type": "string" },
+                  "questions": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 15,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "question_id": { "type": "string" },
+                        "question_text": { "type": "string" },
+                        "options": {
+                          "type": "array",
+                          "minItems": 3,
+                          "maxItems": 5,
+                          "items": { "type": "string" }
+                        },
+                        "correct_answer": { "type": "string" }
+                      },
+                      "required": [
+                        "question_id",
+                        "question_text",
+                        "options",
+                        "correct_answer"
+                      ]
                     }
-                  ]
+                  }
                 },
-                {
-                  "part": 2,
-                  "audio_url": "JVBERi0xLjQKJeLjz9MKMyAwIG9iago8PC9MZW5ndGggND...",
-                  "questions": [
-                    {
-                      "question_id": "q3",
-                      "question_text": "What is the woman's opinion about online shopping?",
-                      "options": [
-                        "It is convenient but often unreliable.",
-                        "It saves time and offers great deals.",
-                        "It is harmful to small local businesses.",
-                        "It leads to unnecessary spending."
-                      ],
-                      "correct_answer": "It saves time and offers great deals."
-                    }
-                  ]
+                "required": ["part", "passage_id", "text", "questions"]
+              }
+            },
+            "writing": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "part": { "type": "integer", "minimum": 1, "maximum": 2 },
+                  "prompt": { "type": "string" },
+                  "sample_answer": { "type": "string" }
                 },
-                {
-                  "part": 3,
-                  "audio_url": "https://example.com/audio/listening_part3.mp3",
-                  "questions": [
-                    {
-                      "question_id": "q4",
-                      "question_text": "What is the purpose of the announcement?",
-                      "options": [
-                        "To promote a new product launch.",
-                        "To inform customers about store hours.",
-                        "To announce a special discount event.",
-                        "To warn about potential scams."
-                      ],
-                      "correct_answer": "To announce a special discount event."
-                    }
-                  ]
-                }
-              ],
-              "reading": [
-                {
-                  "part": 1,
-                  "passage_id": "passage_001",
-                  "text": "The Industrial Revolution was a period of major industrialization that took place during the late 18th and early 19th centuries. It began in Great Britain and later spread to other parts of the world. The revolution introduced new manufacturing processes, including the use of machinery and steam power, which significantly increased productivity.",
-                  "questions": [
-                    {
-                      "question_id": "q5",
-                      "question_text": "What was the main cause of the Industrial Revolution?",
-                      "options": [
-                        "The discovery of electricity.",
-                        "Advancements in agricultural techniques.",
-                        "The invention of the steam engine.",
-                        "Increased demand for handmade goods."
-                      ],
-                      "correct_answer": "The invention of the steam engine."
-                    }
-                  ]
+                "required": ["part", "prompt", "sample_answer"]
+              }
+            },
+            "speaking": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "part": { "type": "integer", "minimum": 1, "maximum": 3 },
+                  "prompt": { "type": "string" },
+                  "sample_answer": { "type": "string" }
                 },
-                {
-                  "part": 2,
-                  "passage_id": "passage_002",
-                  "text": "Climate change is one of the most pressing issues of our time. It refers to significant changes in global temperatures and weather patterns over time. Human activities, such as burning fossil fuels and deforestation, have been identified as major contributors to this phenomenon.",
-                  "questions": [
-                    {
-                      "question_id": "q6",
-                      "question_text": "What is the primary effect of climate change mentioned in the passage?",
-                      "options": [
-                        "Rising sea levels.",
-                        "Increased frequency of natural disasters.",
-                        "Loss of biodiversity.",
-                        "Extreme weather conditions."
-                      ],
-                      "correct_answer": "Extreme weather conditions."
-                    }
-                  ]
-                },
-                {
-                  "part": 3,
-                  "passage_id": "passage_003",
-                  "text": "Artificial intelligence (AI) is transforming industries worldwide by automating tasks, improving efficiency, and enabling new capabilities. From healthcare to transportation, AI technologies are being integrated into various sectors to solve complex problems.",
-                  "questions": [
-                    {
-                      "question_id": "q7",
-                      "question_text": "What is the main advantage of AI according to the passage?",
-                      "options": [
-                        "It eliminates the need for human workers.",
-                        "It solves complex problems across industries.",
-                        "It reduces the cost of production significantly.",
-                        "It enhances creativity in artistic fields."
-                      ],
-                      "correct_answer": "It solves complex problems across industries."
-                    }
-                  ]
-                },
-                {
-                  "part": 4,
-                  "passage_id": "passage_004",
-                  "text": "The history of the Internet dates back to the 1960s when the U.S. Department of Defense developed ARPANET, an early network designed for communication between universities and research institutions. Over time, the Internet evolved into a global system connecting billions of devices.",
-                  "questions": [
-                    {
-                      "question_id": "q8",
-                      "question_text": "What was the original purpose of the Internet?",
-                      "options": [
-                        "To provide entertainment content.",
-                        "To connect researchers and share information.",
-                        "To facilitate e-commerce transactions.",
-                        "To enable social media platforms."
-                      ],
-                      "correct_answer": "To connect researchers and share information."
-                    }
-                  ]
-                }
-              ],
-              "writing": [
-                {
-                  "part": 1,
-                  "prompt": "Write an essay discussing the impact of social media on society.",
-                  "sample_answer": "Social media has revolutionized the way people communicate and share information. While it offers numerous benefits, such as connecting individuals globally, it also raises concerns about privacy and mental health."
-                },
-                {
-                  "part": 2,
-                  "prompt": "Describe a memorable event in your life and explain why it was important.",
-                  "sample_answer": "One of the most memorable events in my life was when I graduated from university. It marked the culmination of years of hard work and opened doors to new opportunities."
-                }
-              ],
-              "speaking": [
-                {
-                  "part": 1,
-                  "prompt": "Talk about your favorite hobby and why you enjoy it.",
-                  "sample_answer": "My favorite hobby is reading because it helps me relax and expands my knowledge on various topics."
-                },
-                {
-                  "part": 2,
-                  "prompt": "Describe a person who has influenced you positively.",
-                  "sample_answer": "The person who has influenced me the most is my teacher, who always encouraged me to pursue my dreams and never give up."
-                },
-                {
-                  "part": 3,
-                  "prompt": "Discuss the advantages and disadvantages of remote work.",
-                  "sample_answer": "Remote work offers flexibility but can also lead to isolation and challenges in maintaining work-life balance."
-                }
-              ],
-              "visibility": "ready",
-              "signature": "abc123xyz",
-              "attempt_count": 42
+                "required": ["part", "prompt", "sample_answer"]
+              }
+            },
+            "visibility": {
+              "type": "string",
+              "enum": ["pending", "ready", "rejected"],
+              "description": "The visibility status of the material: pending, ready, or rejected."
+            },
+            "signature": {
+              "type": "string",
+              "description": "Digital signature to verify authorship."
+            },
+            "attempt_count": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The number of times users have attempted this practice material."
             }
-          ]
-        }
-      },
-      "private": {
-        "node_function": {
-          "edge": [
-            {
-              "pipeline": [
-                {
-                  "$match": {
-                    "card_id": { "$exists": true, "$type": "string" },
-                    "user_id": { "$exists": true, "$type": "string" }
-                  }
-                },
-                {
-                  "$lookup": {
-                    "from": "collection_user_login",
-                    "localField": "user_id",
-                    "foreignField": "user_id",
-                    "as": "user_login_data"
-                  }
-                },
-                {
-                  "$unwind": "$user_login_data"
-                },
-                {
-                  "$match": {
-                    "user_login_data.token_login.expires_at": { "$gt": "$$NOW" }
-                  }
-                }
-              ],
-              "purpose": "kiểm tra xem người dùng có thẻ hay không",
-              "data_input_from_node": ["collection_user_login"],
-
-              "data_output_to_node": ["collection_practice_materials"]
-            },
-            {
-              "pipeline": [
-                {
-                  "$match": {
-                    "visibility": "pending",
-                    "user_id": { "$exists": true }
-                  }
-                },
-                {
-                  "$lookup": {
-                    "from": "collection_cards",
-                    "localField": "user_id",
-                    "foreignField": "user_id",
-                    "as": "card_data"
-                  }
-                },
-                {
-                  "$addFields": {
-                    "signature": {
-                      "$cond": [
-                        { "$eq": ["$signature", true] },
-                        { "$arrayElemAt": ["$card_data.signature", 0] },
-                        "$signature"
-                      ]
-                    }
-                  }
-                },
-                {
-                  "$lookup": {
-                    "from": "collection_practice_materials",
-                    "let": {
-                      "level": "$level",
-                      "listening": "$listening",
-                      "reading": "$reading",
-                      "writing": "$writing",
-                      "speaking": "$speaking"
-                    },
-                    "pipeline": [
-                      {
-                        "$expr": {
-                          "$and": [
-                            { "$eq": ["$level", "$$level"] },
-                            { "$eq": ["$listening", "$$listening"] },
-                            { "$eq": ["$reading", "$$reading"] },
-                            { "$eq": ["$writing", "$$writing"] },
-                            { "$eq": ["$speaking", "$$speaking"] }
-                          ]
-                        }
-                      }
+          },
+          "required": [
+            "user_id",
+            "upload_date",
+            "level",
+            "listening",
+            "reading",
+            "writing",
+            "speaking",
+            "signature"
+          ],
+          "additionalProperties": false
+        },
+        "jsonSample": [
+          {
+            "_id": "material_001",
+            "user_id": "user_12345",
+            "material_id": "mat_67890",
+            "upload_date": "2023-10-15T14:35:00Z",
+            "level": "B2",
+            "listening": [
+              {
+                "part": 1,
+                "audio_url": "https://example.com/audio/listening_part1.mp3",
+                "questions": [
+                  {
+                    "question_id": "q1",
+                    "question_text": "What is the main topic of the conversation?",
+                    "options": [
+                      "The importance of saving money.",
+                      "How to invest in stocks.",
+                      "Tips for planning a vacation.",
+                      "Strategies for starting a business."
                     ],
-                    "as": "duplicateMaterials"
+                    "correct_answer": "The importance of saving money."
+                  },
+                  {
+                    "question_id": "q2",
+                    "question_text": "What does the man suggest about managing finances?",
+                    "options": [
+                      "Avoid using credit cards entirely.",
+                      "Set aside a fixed amount each month.",
+                      "Invest all savings into real estate.",
+                      "Spend freely as long as income allows."
+                    ],
+                    "correct_answer": "Set aside a fixed amount each month."
                   }
-                },
-                {
-                  "$addFields": {
-                    "isDuplicate": { "$ne": ["$duplicateMaterials", []] }
+                ]
+              },
+              {
+                "part": 2,
+                "audio_url": "JVBERi0xLjQKJeLjz9MKMyAwIG9iago8PC9MZW5ndGggND...",
+                "questions": [
+                  {
+                    "question_id": "q3",
+                    "question_text": "What is the woman's opinion about online shopping?",
+                    "options": [
+                      "It is convenient but often unreliable.",
+                      "It saves time and offers great deals.",
+                      "It is harmful to small local businesses.",
+                      "It leads to unnecessary spending."
+                    ],
+                    "correct_answer": "It saves time and offers great deals."
                   }
-                },
-                {
-                  "$match": {
-                    "isDuplicate": false
+                ]
+              },
+              {
+                "part": 3,
+                "audio_url": "https://example.com/audio/listening_part3.mp3",
+                "questions": [
+                  {
+                    "question_id": "q4",
+                    "question_text": "What is the purpose of the announcement?",
+                    "options": [
+                      "To promote a new product launch.",
+                      "To inform customers about store hours.",
+                      "To announce a special discount event.",
+                      "To warn about potential scams."
+                    ],
+                    "correct_answer": "To announce a special discount event."
                   }
-                },
-                {
-                  "$lookup": {
-                    "from": "collection_practice_materials",
-                    "localField": "user_id",
-                    "foreignField": "user_id",
-                    "as": "existing_materials"
+                ]
+              }
+            ],
+            "reading": [
+              {
+                "part": 1,
+                "passage_id": "passage_001",
+                "text": "The Industrial Revolution was a period of major industrialization that took place during the late 18th and early 19th centuries. It began in Great Britain and later spread to other parts of the world. The revolution introduced new manufacturing processes, including the use of machinery and steam power, which significantly increased productivity.",
+                "questions": [
+                  {
+                    "question_id": "q5",
+                    "question_text": "What was the main cause of the Industrial Revolution?",
+                    "options": [
+                      "The discovery of electricity.",
+                      "Advancements in agricultural techniques.",
+                      "The invention of the steam engine.",
+                      "Increased demand for handmade goods."
+                    ],
+                    "correct_answer": "The invention of the steam engine."
                   }
-                },
-                {
-                  "$addFields": {
-                    "attempt_count": { "$size": "$existing_materials" }
+                ]
+              },
+              {
+                "part": 2,
+                "passage_id": "passage_002",
+                "text": "Climate change is one of the most pressing issues of our time. It refers to significant changes in global temperatures and weather patterns over time. Human activities, such as burning fossil fuels and deforestation, have been identified as major contributors to this phenomenon.",
+                "questions": [
+                  {
+                    "question_id": "q6",
+                    "question_text": "What is the primary effect of climate change mentioned in the passage?",
+                    "options": [
+                      "Rising sea levels.",
+                      "Increased frequency of natural disasters.",
+                      "Loss of biodiversity.",
+                      "Extreme weather conditions."
+                    ],
+                    "correct_answer": "Extreme weather conditions."
                   }
-                },
-                {
-                  "$addFields": {
-                    "material_id": {
-                      "$concat": [
-                        "PracticeMaterials_",
-                        "$user_id",
-                        "_",
-                        { "$toString": "$attempt_count" },
-                        "_",
-                        { "$toString": { "$toObjectId": "$$NOW" } }
-                      ]
-                    }
+                ]
+              },
+              {
+                "part": 3,
+                "passage_id": "passage_003",
+                "text": "Artificial intelligence (AI) is transforming industries worldwide by automating tasks, improving efficiency, and enabling new capabilities. From healthcare to transportation, AI technologies are being integrated into various sectors to solve complex problems.",
+                "questions": [
+                  {
+                    "question_id": "q7",
+                    "question_text": "What is the main advantage of AI according to the passage?",
+                    "options": [
+                      "It eliminates the need for human workers.",
+                      "It solves complex problems across industries.",
+                      "It reduces the cost of production significantly.",
+                      "It enhances creativity in artistic fields."
+                    ],
+                    "correct_answer": "It solves complex problems across industries."
                   }
-                },
-                {
-                  "$merge": {
-                    "into": "collection_practice_materials",
-                    "on": "_id",
-                    "whenMatched": "merge",
-                    "whenNotMatched": "insert"
+                ]
+              },
+              {
+                "part": 4,
+                "passage_id": "passage_004",
+                "text": "The history of the Internet dates back to the 1960s when the U.S. Department of Defense developed ARPANET, an early network designed for communication between universities and research institutions. Over time, the Internet evolved into a global system connecting billions of devices.",
+                "questions": [
+                  {
+                    "question_id": "q8",
+                    "question_text": "What was the original purpose of the Internet?",
+                    "options": [
+                      "To provide entertainment content.",
+                      "To connect researchers and share information.",
+                      "To facilitate e-commerce transactions.",
+                      "To enable social media platforms."
+                    ],
+                    "correct_answer": "To connect researchers and share information."
+                  }
+                ]
+              }
+            ],
+            "writing": [
+              {
+                "part": 1,
+                "prompt": "Write an essay discussing the impact of social media on society.",
+                "sample_answer": "Social media has revolutionized the way people communicate and share information. While it offers numerous benefits, such as connecting individuals globally, it also raises concerns about privacy and mental health."
+              },
+              {
+                "part": 2,
+                "prompt": "Describe a memorable event in your life and explain why it was important.",
+                "sample_answer": "One of the most memorable events in my life was when I graduated from university. It marked the culmination of years of hard work and opened doors to new opportunities."
+              }
+            ],
+            "speaking": [
+              {
+                "part": 1,
+                "prompt": "Talk about your favorite hobby and why you enjoy it.",
+                "sample_answer": "My favorite hobby is reading because it helps me relax and expands my knowledge on various topics."
+              },
+              {
+                "part": 2,
+                "prompt": "Describe a person who has influenced you positively.",
+                "sample_answer": "The person who has influenced me the most is my teacher, who always encouraged me to pursue my dreams and never give up."
+              },
+              {
+                "part": 3,
+                "prompt": "Discuss the advantages and disadvantages of remote work.",
+                "sample_answer": "Remote work offers flexibility but can also lead to isolation and challenges in maintaining work-life balance."
+              }
+            ],
+            "visibility": "ready",
+            "signature": "abc123xyz",
+            "attempt_count": 42
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "card_id": { "$exists": true, "$type": "string" },
+                  "user_id": { "$exists": true, "$type": "string" }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_user_login",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_login_data"
+                }
+              },
+              {
+                "$unwind": "$user_login_data"
+              },
+              {
+                "$match": {
+                  "user_login_data.token_login.expires_at": { "$gt": "$$NOW" }
+                }
+              }
+            ],
+            "purpose": "kiểm tra xem người dùng có thẻ hay không",
+            "data_input_from_node": ["collection_user_login"],
+
+            "data_output_to_node": ["collection_practice_materials"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "visibility": "pending",
+                  "user_id": { "$exists": true }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$addFields": {
+                  "signature": {
+                    "$cond": [
+                      { "$eq": ["$signature", true] },
+                      { "$arrayElemAt": ["$card_data.signature", 0] },
+                      "$signature"
+                    ]
                   }
                 }
-              ],
-              "purpose": "Lưu practice materials với kiểm tra trùng lặp và material_id tự sinh",
-              "data_input_from_node": [
-                "collection_cards",
-                "collection_practice_materials"
-              ],
-              "data_output_to_node": ["collection_practice_materials"]
-            },
-            {
-              "pipeline": [
-                {
-                  "$match": {
-                    "visibility": "pending",
-                    "user_id": { "$exists": true },
-                    "can_post_materials": true
-                  }
-                },
-                {
-                  "$lookup": {
-                    "from": "collection_practice_materials",
-                    "localField": "material_id",
-                    "foreignField": "material_id",
-                    "as": "existing_materials"
-                  }
-                },
-                {
-                  "$lookup": {
-                    "from": "collection_user_tests",
-                    "localField": "user_id",
-                    "foreignField": "user_id",
-                    "as": "user_test_data"
-                  }
-                },
-                {
-                  "$match": {
-                    "user_test_data.can_post_materials": true
-                  }
-                },
-                {
-                  "$addFields": {
-                    "is_duplicate": {
-                      "$cond": {
-                        "if": {
-                          "$gt": [{ "$size": "$existing_materials" }, 0]
-                        },
-                        "then": true,
-                        "else": false
+              },
+              {
+                "$lookup": {
+                  "from": "collection_practice_materials",
+                  "let": {
+                    "level": "$level",
+                    "listening": "$listening",
+                    "reading": "$reading",
+                    "writing": "$writing",
+                    "speaking": "$speaking"
+                  },
+                  "pipeline": [
+                    {
+                      "$expr": {
+                        "$and": [
+                          { "$eq": ["$level", "$$level"] },
+                          { "$eq": ["$listening", "$$listening"] },
+                          { "$eq": ["$reading", "$$reading"] },
+                          { "$eq": ["$writing", "$$writing"] },
+                          { "$eq": ["$speaking", "$$speaking"] }
+                        ]
                       }
                     }
+                  ],
+                  "as": "duplicateMaterials"
+                }
+              },
+              {
+                "$addFields": {
+                  "isDuplicate": { "$ne": ["$duplicateMaterials", []] }
+                }
+              },
+              {
+                "$match": {
+                  "isDuplicate": false
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_practice_materials",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "existing_materials"
+                }
+              },
+              {
+                "$addFields": {
+                  "attempt_count": { "$size": "$existing_materials" }
+                }
+              },
+              {
+                "$addFields": {
+                  "material_id": {
+                    "$concat": [
+                      "PracticeMaterials_",
+                      "$user_id",
+                      "_",
+                      { "$toString": "$attempt_count" },
+                      "_",
+                      { "$toString": { "$toObjectId": "$$NOW" } }
+                    ]
                   }
-                },
-                {
-                  "$lookup": {
-                    "from": "collection_cards",
-                    "localField": "signature",
-                    "foreignField": "signature",
-                    "as": "verified_signature"
-                  }
-                },
-                {
-                  "$addFields": {
-                    "is_signature_valid": {
-                      "$cond": {
-                        "if": {
-                          "$gt": [{ "$size": "$verified_signature" }, 0]
-                        },
-                        "then": true,
-                        "else": false
-                      }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_practice_materials",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Lưu practice materials với kiểm tra trùng lặp và material_id tự sinh",
+            "data_input_from_node": [
+              "collection_cards",
+              "collection_practice_materials"
+            ],
+            "data_output_to_node": ["collection_practice_materials"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "visibility": "pending",
+                  "user_id": { "$exists": true },
+                  "can_post_materials": true
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_practice_materials",
+                  "localField": "material_id",
+                  "foreignField": "material_id",
+                  "as": "existing_materials"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_user_tests",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_test_data"
+                }
+              },
+              {
+                "$match": {
+                  "user_test_data.can_post_materials": true
+                }
+              },
+              {
+                "$addFields": {
+                  "is_duplicate": {
+                    "$cond": {
+                      "if": {
+                        "$gt": [{ "$size": "$existing_materials" }, 0]
+                      },
+                      "then": true,
+                      "else": false
                     }
                   }
-                },
-                {
-                  "$addFields": {
-                    "is_vstep_compliant": {
-                      "$and": [
-                        { "$eq": [{ "$size": "$listening" }, 3] },
-                        { "$eq": [{ "$size": "$reading" }, 4] },
-                        { "$eq": [{ "$size": "$writing" }, 2] },
-                        { "$eq": [{ "$size": "$speaking" }, 3] }
-                      ]
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "signature",
+                  "foreignField": "signature",
+                  "as": "verified_signature"
+                }
+              },
+              {
+                "$addFields": {
+                  "is_signature_valid": {
+                    "$cond": {
+                      "if": {
+                        "$gt": [{ "$size": "$verified_signature" }, 0]
+                      },
+                      "then": true,
+                      "else": false
                     }
                   }
-                },
-                {
-                  "$addFields": {
-                    "material_id": {
-                      "$cond": {
-                        "if": { "$eq": ["$material_id", null] },
-                        "then": {
-                          "$function": {
-                            "body": "function() { return require('crypto').randomUUID(); }",
-                            "args": [],
-                            "lang": "js"
+                }
+              },
+              {
+                "$addFields": {
+                  "is_vstep_compliant": {
+                    "$and": [
+                      { "$eq": [{ "$size": "$listening" }, 3] },
+                      { "$eq": [{ "$size": "$reading" }, 4] },
+                      { "$eq": [{ "$size": "$writing" }, 2] },
+                      { "$eq": [{ "$size": "$speaking" }, 3] }
+                    ]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "material_id": {
+                    "$cond": {
+                      "if": { "$eq": ["$material_id", null] },
+                      "then": {
+                        "$function": {
+                          "body": "function() { return require('crypto').randomUUID(); }",
+                          "args": [],
+                          "lang": "js"
+                        }
+                      },
+
+                      "else": "$material_id"
+                    }
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "listening.questions.audio_url": {
+                    "$exists": true,
+                    "$and": [
+                      { "$ne": ["$$question.audio_url", null] },
+                      { "$ne": ["$$question.audio_url", ""] }
+                    ]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "listening.questions": {
+                    "$map": {
+                      "input": "$listening.questions",
+                      "as": "question",
+                      "in": {
+                        "question_id": "$$question.question_id",
+                        "audio_url": {
+                          "$cond": {
+                            "if": {
+                              "$and": [
+                                { "$ne": ["$$question.audio_url", null] },
+                                { "$ne": ["$$question.audio_url", ""] }
+                              ]
+                            },
+                            "then": {
+                              "$cond": {
+                                "if": {
+                                  "$regexMatch": {
+                                    "input": "$$question.audio_url",
+                                    "regex": "^https?://",
+                                    "options": "i"
+                                  }
+                                },
+                                "then": "$$question.audio_url",
+                                "else": "$$question.audio_url"
+                              }
+                            }
                           }
                         },
-
-                        "else": "$material_id"
-                      }
-                    }
-                  }
-                },
-                {
-                  "$match": {
-                    "listening.questions.audio_url": {
-                      "$exists": true,
-                      "$and": [
-                        { "$ne": ["$$question.audio_url", null] },
-                        { "$ne": ["$$question.audio_url", ""] }
-                      ]
-                    }
-                  }
-                },
-                {
-                  "$addFields": {
-                    "listening.questions": {
-                      "$map": {
-                        "input": "$listening.questions",
-                        "as": "question",
-                        "in": {
-                          "question_id": "$$question.question_id",
-                          "audio_url": {
-                            "$cond": {
-                              "if": {
-                                "$and": [
-                                  { "$ne": ["$$question.audio_url", null] },
-                                  { "$ne": ["$$question.audio_url", ""] }
+                        "audio_metadata": {
+                          "$mergeObjects": [
+                            "$$question.audio_metadata",
+                            {
+                              "file_name": {
+                                "$ifNull": [
+                                  "$$question.audio_metadata.file_name",
+                                  "default_audio.mp3"
                                 ]
                               },
-                              "then": {
-                                "$cond": {
-                                  "if": {
-                                    "$regexMatch": {
-                                      "input": "$$question.audio_url",
-                                      "regex": "^https?://",
-                                      "options": "i"
-                                    }
-                                  },
-                                  "then": "$$question.audio_url",
-                                  "else": "$$question.audio_url"
-                                }
-                              }
-                            }
-                          },
-                          "audio_metadata": {
-                            "$mergeObjects": [
-                              "$$question.audio_metadata",
-                              {
-                                "file_name": {
-                                  "$ifNull": [
-                                    "$$question.audio_metadata.file_name",
-                                    "default_audio.mp3"
-                                  ]
-                                },
-                                "file_size": {
-                                  "$ifNull": [
-                                    "$$question.audio_metadata.file_size",
-                                    0
-                                  ]
-                                },
-                                "mime_type": {
-                                  "$ifNull": [
-                                    "$$question.audio_metadata.mime_type",
-                                    "audio/mp3"
-                                  ]
-                                },
-                                "uploaded_at": {
-                                  "$ifNull": [
-                                    "$$question.audio_metadata.uploaded_at",
-                                    "$$NOW"
-                                  ]
-                                }
-                              }
-                            ]
-                          },
-                          "question_text": "$$question.question_text",
-                          "options": "$$question.options",
-                          "correct_answer": "$$question.correct_answer"
-                        }
-                      }
-                    }
-                  }
-                },
-                {
-                  "$addFields": {
-                    "visibility": {
-                      "$switch": {
-                        "branches": [
-                          {
-                            "case": {
-                              "$or": [
-                                "$is_duplicate",
-                                { "$not": "$is_signature_valid" }
-                              ]
-                            },
-                            "then": "rejected"
-                          },
-                          {
-                            "case": { "$not": "$is_vstep_compliant" },
-                            "then": "rejected"
-                          },
-                          {
-                            "case": {
-                              "$and": [
-                                "$is_vstep_compliant",
-                                "$is_signature_valid",
-                                { "$not": "$is_duplicate" }
-                              ]
-                            },
-                            "then": "ready"
-                          }
-                        ],
-                        "default": "pending"
-                      }
-                    },
-                    "review_feedback": {
-                      "$cond": {
-                        "if": { "$eq": ["$visibility", "rejected"] },
-                        "then": {
-                          "$concatArrays": [
-                            {
-                              "$cond": {
-                                "if": "$is_duplicate",
-                                "then": ["Duplicate material."],
-                                "else": []
-                              }
-                            },
-                            {
-                              "$cond": {
-                                "if": { "$not": "$is_signature_valid" },
-                                "then": ["Invalid signature."],
-                                "else": []
-                              }
-                            },
-                            {
-                              "$cond": {
-                                "if": { "$not": "$is_vstep_compliant" },
-                                "then": ["Not compliant with VSTEP structure."],
-                                "else": []
+                              "file_size": {
+                                "$ifNull": [
+                                  "$$question.audio_metadata.file_size",
+                                  0
+                                ]
+                              },
+                              "mime_type": {
+                                "$ifNull": [
+                                  "$$question.audio_metadata.mime_type",
+                                  "audio/mp3"
+                                ]
+                              },
+                              "uploaded_at": {
+                                "$ifNull": [
+                                  "$$question.audio_metadata.uploaded_at",
+                                  "$$NOW"
+                                ]
                               }
                             }
                           ]
                         },
-                        "else": []
+                        "question_text": "$$question.question_text",
+                        "options": "$$question.options",
+                        "correct_answer": "$$question.correct_answer"
                       }
                     }
-                  }
-                },
-                {
-                  "$addFields": {
-                    "upload_date": {
-                      "$cond": {
-                        "if": { "$eq": ["$upload_date", null] },
-                        "then": "$$NOW",
-                        "else": "$upload_date"
-                      }
-                    }
-                  }
-                },
-                {
-                  "$merge": {
-                    "into": "collection_practice_materials",
-                    "on": "_id",
-                    "whenMatched": "merge",
-                    "whenNotMatched": "insert"
                   }
                 }
-              ],
-              "purpose": "Cho phép user đăng bài vào collection_practice_materials nếu đạt điểm trung bình >= 5.",
-              "data_input_from_node": ["collection_user_tests"],
-              "data_output_to_node": ["collection_practice_materials"]
-            }
-          ]
-        }
-      },
-      "personal": {
-        "node_info": {
-          "name": "English Test System",
-          "author": "Joshept",
-          "version": "1.0",
-          "year": "2025"
-        }
+              },
+              {
+                "$addFields": {
+                  "visibility": {
+                    "$switch": {
+                      "branches": [
+                        {
+                          "case": {
+                            "$or": [
+                              "$is_duplicate",
+                              { "$not": "$is_signature_valid" }
+                            ]
+                          },
+                          "then": "rejected"
+                        },
+                        {
+                          "case": { "$not": "$is_vstep_compliant" },
+                          "then": "rejected"
+                        },
+                        {
+                          "case": {
+                            "$and": [
+                              "$is_vstep_compliant",
+                              "$is_signature_valid",
+                              { "$not": "$is_duplicate" }
+                            ]
+                          },
+                          "then": "ready"
+                        }
+                      ],
+                      "default": "pending"
+                    }
+                  },
+                  "review_feedback": {
+                    "$cond": {
+                      "if": { "$eq": ["$visibility", "rejected"] },
+                      "then": {
+                        "$concatArrays": [
+                          {
+                            "$cond": {
+                              "if": "$is_duplicate",
+                              "then": ["Duplicate material."],
+                              "else": []
+                            }
+                          },
+                          {
+                            "$cond": {
+                              "if": { "$not": "$is_signature_valid" },
+                              "then": ["Invalid signature."],
+                              "else": []
+                            }
+                          },
+                          {
+                            "$cond": {
+                              "if": { "$not": "$is_vstep_compliant" },
+                              "then": ["Not compliant with VSTEP structure."],
+                              "else": []
+                            }
+                          }
+                        ]
+                      },
+                      "else": []
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "upload_date": {
+                    "$cond": {
+                      "if": { "$eq": ["$upload_date", null] },
+                      "then": "$$NOW",
+                      "else": "$upload_date"
+                    }
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_practice_materials",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Cho phép user đăng bài vào collection_practice_materials nếu đạt điểm trung bình >= 5.",
+            "data_input_from_node": ["collection_user_tests"],
+            "data_output_to_node": ["collection_practice_materials"]
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
       }
     }
-  ],
+  },
+
   {
     "_id": "collection_save_user_vocabulary",
     "public": {
