@@ -37,6 +37,12 @@
               "enum": ["active", "blocked"],
               "description": "Trạng thái thẻ"
             },
+            "balance": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "description": "Số dư hiện tại trên thẻ (đơn vị VND)."
+            },
             "device_id": {
               "type": "string",
               "description": "ID của thiết bị sử dụng thẻ (nếu có).",
@@ -4612,6 +4618,7 @@
       }
     }
   },
+
   {
     "_id": "supporting_feedback",
     "public": {
@@ -4859,6 +4866,725 @@
         ]
       }
     },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+
+  {
+    "_id": "collection_user_transactions",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "UserTransactionData",
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "description": "ID duy nhất của giao dịch."
+            },
+            "user_id": {
+              "type": "string",
+              "unique": true,
+              "description": "ID người dùng thực hiện giao dịch."
+            },
+            "transaction_type": {
+              "type": "string",
+              "enum": ["deposit", "payment", "reward"],
+              "description": "Loại giao dịch: nạp tiền, thanh toán, hoặc thưởng."
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": 10000,
+              "maximum": 10000,
+              "description": "Số tiền liên quan đến giao dịch (đơn vị VND)."
+            },
+            "description": {
+              "type": "string",
+              "description": "Mô tả chi tiết về giao dịch."
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời gian giao dịch được tạo."
+            },
+            "card_id": {
+              "type": "string",
+              "unique": true,
+              "description": "ID thẻ xác minh người dùng."
+            },
+            "signature": {
+              "type": "string",
+              "description": "Chữ ký số được tạo bởi ví của người dùng."
+            },
+            "public_key": {
+              "type": "string",
+              "description": "Khóa công khai để xác thực chữ ký số."
+            },
+            "status": {
+              "type": "string",
+              "enum": ["pending", "completed", "failed"],
+              "description": "Trạng thái của giao dịch."
+            }
+          },
+          "required": [
+            "_id",
+            "user_id",
+            "transaction_type",
+            "amount",
+            "description",
+            "created_at",
+            "status"
+          ],
+          "additionalProperties": false
+        },
+        "jsonSample": [
+          {
+            "_id": "TXN123456789",
+            "user_id": "USER123",
+            "transaction_type": "payment",
+            "amount": 10000,
+            "description": "Thanh toán để làm thêm 5 bài tập.",
+            "created_at": "2025-02-14T19:00:00.000Z",
+            "card_id": "CARD123",
+            "signature": "SIGNATURE123",
+            "public_key": "PUBLICKEY123",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "last_reset_time": { "$exists": true },
+                  "$expr": {
+                    "$lt": [
+                      "$last_reset_time",
+                      {
+                        "$add": [
+                          {
+                            "$dateTrunc": {
+                              "date": "$$NOW",
+                              "unit": "day",
+                              "binSize": 1,
+                              "timezone": "Asia/Ho_Chi_Minh"
+                            }
+                          },
+                          { "$literal": 25200000 }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "material_count": 0,
+                  "remaining_attempts": 0,
+                  "last_reset_time": { "$now": [] }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_quota",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Reset số lượng bài tập và lượt làm bài còn lại vào lúc 7:00 AM hằng ngày.",
+            "data_input_from_node": ["collection_user_quota"],
+            "data_output_to_node": ["collection_user_quota"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "section": {
+                    "$in": ["listening", "reading", "writing", "speaking"]
+                  },
+                  "submission_time": {
+                    "$gte": { "$date": { "$startOfDay": { "$now": [] } } },
+                    "$lt": { "$now": [] }
+                  }
+                }
+              },
+              {
+                "$group": {
+                  "_id": "$user_id",
+                  "daily_material_count": { "$sum": 1 }
+                }
+              },
+              {
+                "$addFields": {
+                  "can_submit_more": {
+                    "$cond": {
+                      "if": { "$lte": ["$daily_material_count", 2] },
+                      "then": true,
+                      "else": false
+                    }
+                  }
+                }
+              }
+            ],
+            "purpose": "Kiểm tra số lượng bài tập đã làm trong ngày và áp dụng quy tắc thanh toán.",
+            "data_input_from_node": ["collection_materials_user_done"],
+            "data_output_to_node": ["collection_user_quota"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "transaction_type": "payment",
+                  "amount": 10000,
+                  "status": "completed"
+                }
+              },
+              {
+                "$addFields": {
+                  "extra_attempts": 5
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_quota",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Mở khóa thêm bài tập sau khi người dùng thanh toán 10k.",
+            "data_input_from_node": ["collection_user_transactions"],
+            "data_output_to_node": ["collection_user_quota"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "remaining_attempts": { "$gt": 0 }
+                }
+              },
+              {
+                "$addFields": {
+                  "remaining_attempts": {
+                    "$subtract": ["$remaining_attempts", 1]
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_quota",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Giảm số lượt làm bài còn lại sau khi người dùng hoàn thành một bài tập.",
+            "data_input_from_node": ["collection_user_quota"],
+            "data_output_to_node": ["collection_user_quota"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "transaction_type": "payment",
+                  "status": "failed"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_practice_materials",
+                  "localField": "material_id",
+                  "foreignField": "material_id",
+                  "as": "material_data"
+                }
+              },
+              {
+                "$addFields": {
+                  "is_locked": true
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_practice_materials",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Khóa quyền truy cập vào collection_practice_materials nếu giao dịch thất bại.",
+            "data_input_from_node": ["collection_practice_materials"],
+            "data_output_to_node": ["collection_practice_materials"]
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+
+  {
+    "_id": "collection_system_revenue",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "SystemRevenueData",
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "description": "ID duy nhất của bản ghi."
+            },
+            "date": {
+              "type": "string",
+              "format": "date",
+              "description": "Ngày tính doanh thu (YYYY-MM-DD)."
+            },
+            "total_amount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Tổng số tiền nạp vào hệ thống trong ngày."
+            },
+            "system_share": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Phần doanh thu thuộc về hệ thống (80%)."
+            },
+            "admin_share": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Phần doanh thu thuộc về admin (20%)."
+            }
+          },
+          "required": [
+            "_id",
+            "date",
+            "total_amount",
+            "system_share",
+            "admin_share"
+          ],
+          "additionalProperties": false
+        },
+        "jsonSample": [
+          {
+            "_id": "REVENUE20250214",
+            "date": "2025-02-14",
+            "total_amount": 500000,
+            "system_share": 400000,
+            "admin_share": 100000
+          },
+          {
+            "_id": "REVENUE20250215",
+            "date": "2025-02-15",
+            "total_amount": 300000,
+            "system_share": 240000,
+            "admin_share": 60000
+          },
+          {
+            "_id": "REVENUE20250216",
+            "date": "2025-02-16",
+            "total_amount": 700000,
+            "system_share": 560000,
+            "admin_share": 140000
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "transaction_type": "deposit",
+                  "status": "completed",
+                  "created_at": {
+                    "$gte": "2025-02-14T00:00:00.000Z",
+                    "$lt": "2025-02-15T00:00:00.000Z"
+                  }
+                }
+              },
+              {
+                "$group": {
+                  "_id": null,
+                  "total_amount": { "$sum": "$amount" }
+                }
+              },
+              {
+                "$addFields": {
+                  "date": "2025-02-14",
+                  "system_share": { "$multiply": ["$total_amount", 0.8] },
+                  "admin_share": { "$multiply": ["$total_amount", 0.2] }
+                }
+              },
+              {
+                "$project": {
+                  "_id": 0,
+                  "date": 1,
+                  "total_amount": 1,
+                  "system_share": 1,
+                  "admin_share": 1
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_system_revenue",
+                  "on": "date",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "date": {
+                    "$gte": "2025-02-01",
+                    "$lte": "2025-02-28"
+                  }
+                }
+              },
+              {
+                "$group": {
+                  "_id": null,
+                  "total_amount": { "$sum": "$total_amount" },
+                  "system_share": { "$sum": "$system_share" },
+                  "admin_share": { "$sum": "$admin_share" }
+                }
+              },
+              {
+                "$project": {
+                  "_id": 0,
+                  "period": "February 2025",
+                  "total_amount": 1,
+                  "system_share": 1,
+                  "admin_share": 1
+                }
+              }
+            ]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "date": "2025-02-14"
+                }
+              },
+              {
+                "$count": "records_found"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+  {
+    "_id": "collection_elite_rewards",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "EliteRewardsData",
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "description": "ID duy nhất của bản ghi."
+            },
+            "elite_id": {
+              "type": "string",
+              "description": "ID của Elite Partner."
+            },
+            "partner_id": {
+              "type": "string",
+              "description": "ID của Partner được matched với Elite."
+            },
+            "reward_amount": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Số tiền thưởng (đơn vị VND)."
+            },
+            "reward_percentage": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "Phần trăm thưởng dựa trên thành tích của partner."
+            },
+            "rank_improvement": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Số hạng tăng lên của partner trong leaderboard."
+            },
+            "reward_date": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời điểm thưởng được trao."
+            },
+            "description": {
+              "type": "string",
+              "description": "Mô tả chi tiết về khoản thưởng."
+            }
+          },
+          "required": [
+            "_id",
+            "elite_id",
+            "partner_id",
+            "reward_amount",
+            "reward_percentage",
+            "rank_improvement",
+            "reward_date",
+            "description"
+          ],
+          "additionalProperties": false
+        },
+        "jsonSample": [
+          {
+            "_id": "REWARD_001",
+            "elite_id": "ELITE_001",
+            "partner_id": "USER_LB_002",
+            "reward_amount": 65000,
+            "reward_percentage": 0.3,
+            "rank_improvement": 15,
+            "reward_date": "2025-02-14T18:26:02.588Z",
+            "description": "Thưởng vì giúp partner thăng hạng 15 bậc trong leaderboard."
+          },
+          {
+            "_id": "REWARD_002",
+            "elite_id": "ELITE_002",
+            "partner_id": "USER_LB_003",
+            "reward_amount": 55000,
+            "reward_percentage": 0.2,
+            "rank_improvement": 10,
+            "reward_date": "2025-02-14T19:00:00.000Z",
+            "description": "Thưởng vì giúp partner thăng hạng 10 bậc trong leaderboard."
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "status": "active",
+                  "is_partner": true
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_leaderboard",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "leaderboard_data"
+                }
+              },
+              {
+                "$unwind": "$leaderboard_data"
+              },
+              {
+                "$addFields": {
+                  "current_rank": "$leaderboard_data.rank",
+                  "previous_rank": {
+                    "$ifNull": [
+                      "$leaderboard_data.previous_rank",
+                      "$leaderboard_data.rank"
+                    ]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "rank_improvement": {
+                    "$subtract": ["$previous_rank", "$current_rank"]
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_partners",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Xác định sự cải thiện hạng của partner trong leaderboard.",
+            "data_input_from_node": ["collection_user_partners"],
+            "data_output_to_node": ["collection_user_partners"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "status": "active",
+                  "is_partner": true,
+                  "rank_improvement": { "$gt": 0 }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_elite_partners",
+                  "localField": "matched_with",
+                  "foreignField": "user_id",
+                  "as": "elite_data"
+                }
+              },
+              {
+                "$unwind": "$elite_data"
+              },
+              {
+                "$addFields": {
+                  "reward_percentage": {
+                    "$cond": {
+                      "if": { "$gte": ["$rank_improvement", 15] },
+                      "then": 0.3,
+                      "else": {
+                        "$cond": {
+                          "if": {
+                            "$and": [
+                              { "$gte": ["$rank_improvement", 10] },
+                              { "$lt": ["$rank_improvement", 15] }
+                            ]
+                          },
+                          "then": 0.2,
+                          "else": {
+                            "$cond": {
+                              "if": {
+                                "$and": [
+                                  { "$gte": ["$rank_improvement", 5] },
+                                  { "$lt": ["$rank_improvement", 10] }
+                                ]
+                              },
+                              "then": 0.1,
+                              "else": 0
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "reward_amount": {
+                    "$add": [
+                      { "$multiply": [50000, "$reward_percentage"] },
+                      50000
+                    ]
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_elite_rewards",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Tính toán và cập nhật phần thưởng cho Elite và Partner.",
+            "data_input_from_node": ["collection_user_partners"],
+            "data_output_to_node": ["collection_elite_rewards"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "is_processed": { "$exists": false }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "elite_id",
+                  "foreignField": "user_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$addFields": {
+                  "updated_balance": {
+                    "$add": ["$card_data.balance", "$reward_amount"]
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_cards",
+                  "on": "card_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$set": {
+                  "is_processed": true
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_elite_rewards",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Cộng tiền thưởng vào balance của thẻ trong collection_cards.",
+            "data_input_from_node": [
+              "collection_elite_rewards",
+              "collection_cards"
+            ],
+            "data_output_to_node": [
+              "collection_cards",
+              "collection_elite_rewards"
+            ]
+          }
+        ]
+      }
+    },
+
     "personal": {
       "node_info": {
         "name": "English Test System",
