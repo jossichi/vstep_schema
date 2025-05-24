@@ -3421,47 +3421,392 @@
   },
 
   {
-    "_id": "collection_writing_topics",
+    "_id": "collection_user_writing",
     "public": {
       "node_data": {
         "jsonSchema": {
           "$schema": "http://json-schema.org/draft-07/schema#",
-          "title": "WritingTopics",
+          "title": "UserWritingData",
           "type": "object",
           "properties": {
             "_id": {
               "type": "string",
-              "description": "The unique identifier of the topic."
+              "description": "The unique identifier of the user writing record."
+            },
+            "user_id": {
+              "type": "string",
+              "description": "ID of the user who wrote the essay."
             },
             "topic_id": {
               "type": "string",
-              "unique": true,
-              "description": "ID duy nhất của chủ đề bài viết."
+              "description": "The ID of the randomly selected topic."
             },
-            "title": {
+            "written_essay": {
               "type": "string",
-              "description": "Tiêu đề của chủ đề bài viết."
+              "description": "The essay written by the user."
             },
-            "description": {
-              "type": "string",
-              "description": "Mô tả chi tiết về chủ đề bài viết."
+            "reactions": {
+              "type": "object",
+              "properties": {
+                "like": {
+                  "type": "integer",
+                  "description": "Number of likes received."
+                },
+                "love": {
+                  "type": "integer",
+                  "description": "Number of loves received."
+                },
+                "wow": {
+                  "type": "integer",
+                  "description": "Number of wows received."
+                },
+                "angry": {
+                  "type": "integer",
+                  "description": "Number of angry reactions received."
+                },
+                "haha": {
+                  "type": "integer",
+                  "description": "Number of haha reactions received."
+                }
+              },
+              "required": ["like", "love", "wow", "angry", "haha"],
+              "additionalProperties": false,
+              "description": "Reactions received for the essay."
+            },
+            "reaction_analysis": {
+              "type": "object",
+              "properties": {
+                "api_request": {
+                  "type": "object",
+                  "properties": {
+                    "input_text": {
+                      "type": "string",
+                      "description": "Input text sent to the API (typically the written essay)."
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Timestamp when the API request was made."
+                    }
+                  },
+                  "required": ["input_text", "timestamp"],
+                  "additionalProperties": false,
+                  "description": "Details of the API request to the Facebook Reaction model."
+                },
+                "api_response": {
+                  "type": "object",
+                  "properties": {
+                    "predicted_reactions": {
+                      "type": "object",
+                      "properties": {
+                        "like": {
+                          "type": "number",
+                          "description": "Predicted number of likes."
+                        },
+                        "love": {
+                          "type": "number",
+                          "description": "Predicted number of loves."
+                        },
+                        "wow": {
+                          "type": "number",
+                          "description": "Predicted number of wows."
+                        },
+                        "angry": {
+                          "type": "number",
+                          "description": "Predicted number of angry reactions."
+                        },
+                        "haha": {
+                          "type": "number",
+                          "description": "Predicted number of haha reactions."
+                        }
+                      },
+                      "required": ["like", "love", "wow", "angry", "haha"],
+                      "additionalProperties": false,
+                      "description": "Predicted reactions from the Facebook Reaction model."
+                    },
+                    "confidence_scores": {
+                      "type": "object",
+                      "properties": {
+                        "like": {
+                          "type": "number",
+                          "description": "Confidence score for predicted likes."
+                        },
+                        "love": {
+                          "type": "number",
+                          "description": "Confidence score for predicted loves."
+                        },
+                        "wow": {
+                          "type": "number",
+                          "description": "Confidence score for predicted wows."
+                        },
+                        "angry": {
+                          "type": "number",
+                          "description": "Confidence score for predicted angry reactions."
+                        },
+                        "haha": {
+                          "type": "number",
+                          "description": "Confidence score for predicted haha reactions."
+                        }
+                      },
+                      "required": ["like", "love", "wow", "angry", "haha"],
+                      "additionalProperties": false,
+                      "description": "Confidence scores for the predicted reactions."
+                    },
+                    "status_code": {
+                      "type": "integer",
+                      "description": "HTTP status code returned by the API."
+                    },
+                    "response_time": {
+                      "type": "number",
+                      "description": "Response time of the API in milliseconds."
+                    }
+                  },
+                  "required": [
+                    "predicted_reactions",
+                    "confidence_scores",
+                    "status_code",
+                    "response_time"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Details of the API response from the Facebook Reaction model."
+                }
+              },
+              "required": ["api_request", "api_response"],
+              "additionalProperties": false,
+              "description": "Analysis of reactions using the Facebook Reaction model."
             }
           },
-          "required": ["_id", "topic_id", "title", "description", "difficulty"],
+          "required": [
+            "_id",
+            "user_id",
+            "topic_id",
+            "written_essay",
+            "reactions",
+            "reaction_analysis"
+          ],
           "additionalProperties": false
         },
         "jsonSample": [
           {
-            "_id": "TOPIC001",
-            "topic_id": "t12345",
-            "title": "The Importance of Education",
-            "description": "Write an essay on why education is crucial for personal and societal development."
+            "_id": "664f3b90123abc456def7890",
+            "user_id": "user_123456",
+            "topic_id": "topic_98765",
+            "written_essay": "In recent years, the impact of technology on education has been significant. Online learning platforms have made education more accessible, though challenges remain in engagement and assessment...",
+            "reactions": {
+              "like": 12,
+              "love": 7,
+              "wow": 3,
+              "angry": 0,
+              "haha": 2
+            },
+            "reaction_analysis": {
+              "api_request": {
+                "input_text": "In recent years, the impact of technology on education has been significant. Online learning platforms have made education more accessible, though challenges remain in engagement and assessment...",
+                "timestamp": "2025-05-24T07:00:00Z"
+              },
+              "api_response": {
+                "predicted_reactions": {
+                  "like": 10.5,
+                  "love": 6.2,
+                  "wow": 2.1,
+                  "angry": 0.0,
+                  "haha": 1.3
+                },
+                "confidence_scores": {
+                  "like": 0.92,
+                  "love": 0.87,
+                  "wow": 0.76,
+                  "angry": 0.99,
+                  "haha": 0.63
+                },
+                "status_code": 200,
+                "response_time": 185.7
+              }
+            }
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "card_id": { "$exists": true, "$type": "string" },
+                  "user_id": { "$exists": true, "$type": "string" }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_user_login",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_login_data"
+                }
+              },
+              {
+                "$unwind": "$user_login_data"
+              },
+              {
+                "$match": {
+                  "user_login_data.token_login.expires_at": { "$gt": "$$NOW" }
+                }
+              }
+            ],
+            "purpose": "kiểm tra xem người dùng có thẻ hay không",
+            "data_input_from_node": ["collection_user_login"],
+
+            "data_output_to_node": ["collection_user_writing"]
           },
           {
-            "_id": "TOPIC002",
-            "topic_id": "t67890",
-            "title": "The Impact of Technology on Daily Life",
-            "description": "Discuss how technology has changed the way we live, work, and communicate."
+            "pipeline": [
+              {
+                "$match": {
+                  "status": "active"
+                }
+              },
+              {
+                "$sample": {
+                  "size": 1
+                }
+              },
+              {
+                "$project": {
+                  "_id": 0,
+                  "topic_id": "$_id",
+                  "topic_title": "$title",
+                  "topic_description": "$description"
+                }
+              }
+            ],
+            "purpose": "Chọn ngẫu nhiên một chủ đề từ collection_writing_topics.",
+            "data_input_from_node": ["collection_writing_topics"],
+            "data_output_to_node": ["collection_user_writing"]
+          },
+          {
+            "pipeline": [
+              {
+                "$addFields": {
+                  "api_request": {
+                    "input_text": "$written_essay",
+                    "timestamp": {
+                      "$dateToString": {
+                        "format": "%Y-%m-%dT%H:%M:%S.%LZ",
+                        "date": "$$NOW"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "http_api",
+                  "let": {
+                    "url": "https://www.kaggle.com/models/buixuanloc/facebook-reaction ",
+                    "input_text": "$api_request.input_text"
+                  },
+                  "pipeline": [
+                    {
+                      "$http": {
+                        "method": "POST",
+                        "url": "$$url",
+                        "body": { "input_text": "$$input_text" },
+                        "headers": { "Content-Type": "application/json" }
+                      }
+                    }
+                  ],
+                  "as": "api_response"
+                }
+              },
+              { "$unwind": "$api_response" },
+              {
+                "$addFields": {
+                  "reaction_analysis": {
+                    "api_request": "$api_request",
+                    "api_response": {
+                      "predicted_reactions": "$api_response.body.predicted_reactions",
+                      "confidence_scores": "$api_response.body.confidence_scores",
+                      "status_code": "$api_response.status_code",
+                      "response_time": "$api_response.response_time"
+                    }
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_writing",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Gọi API mô hình Facebook Reaction và lưu kết quả phân tích phản ứng.",
+            "data_input_from_node": ["collection_user_writing"],
+            "data_output_to_node": ["collection_user_writing"]
+          },
+          {
+            "pipeline": [
+              {
+                "$addFields": {
+                  "total_score": {
+                    "$min": [
+                      10,
+                      {
+                        "$max": [
+                          0,
+                          {
+                            "$subtract": [
+                              {
+                                "$sum": [
+                                  "$reactions.like",
+                                  "$reactions.love",
+                                  "$reactions.wow",
+                                  "$reactions.haha"
+                                ]
+                              },
+                              {
+                                "$multiply": ["$reactions.angry", 2]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "$project": {
+                  "_id": 1,
+                  "user_id": 1,
+                  "topic_id": 1,
+                  "written_essay": 1,
+                  "reactions": 1,
+                  "total_score": 1
+                }
+              }
+            ],
+            "purpose": "Tính toán tổng điểm dựa trên phản ứng và lưu vào cơ sở dữ liệu.",
+            "data_input_from_node": ["conAI_url"],
+            "data_output_to_node": ["collection_user_writing"]
+          },
+          {
+            "pipeline": [
+              {
+                "$merge": {
+                  "into": "collection_user_writing",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Lưu kết quả bài thi viết vào collection_user_writing.",
+            "data_input_from_node": ["collection_user_writing"],
+            "data_output_to_node": []
           }
         ]
       }
@@ -5316,6 +5661,7 @@
       }
     }
   },
+
   {
     "_id": "collection_elite_rewards",
     "public": {
