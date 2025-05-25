@@ -2228,344 +2228,6 @@
   },
 
   {
-    "_id": "collection_save_user_vocabulary",
-    "public": {
-      "node_data": {
-        "jsonSchema": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
-          "title": "Save Vocabulary to User Collection",
-          "type": "object",
-          "properties": {
-            "word": {
-              "type": "array",
-              "title": "List of Words",
-              "description": "List of user words with details.",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "word": {
-                    "type": "string",
-                    "title": "Word",
-                    "description": "The English word to save.",
-                    "minLength": 1
-                  },
-                  "partOfSpeech": {
-                    "type": "string",
-                    "title": "Part of Speech",
-                    "description": "The part of speech of the word (e.g., noun, verb, adjective)."
-                  },
-                  "translation": {
-                    "type": "string",
-                    "title": "Translation",
-                    "description": "Vietnamese or native language translation of the word."
-                  },
-                  "exampleSentences": {
-                    "type": "array",
-                    "title": "Example Sentences",
-                    "description": "Example sentences using the word.",
-                    "items": {
-                      "type": "string"
-                    },
-                    "default": []
-                  }
-                },
-                "required": ["word"]
-              }
-            },
-            "userID": {
-              "type": "string",
-              "title": "User ID",
-              "description": "The unique identifier of the user saving the word."
-            },
-            "family_word": {
-              "type": "array",
-              "title": "Family Words",
-              "description": "List of family words with details.",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "word": {
-                    "type": "string",
-                    "title": "Word",
-                    "description": "A related word from the same word family."
-                  },
-                  "partOfSpeech": {
-                    "type": "string",
-                    "title": "Part of Speech",
-                    "description": "The part of speech of the family word."
-                  },
-                  "translation": {
-                    "type": "string",
-                    "title": "Translation",
-                    "description": "Vietnamese or native language translation of the family word."
-                  },
-                  "exampleSentences": {
-                    "type": "array",
-                    "title": "Example Sentences",
-                    "description": "Example sentences using the family word.",
-                    "items": {
-                      "type": "string"
-                    },
-                    "default": []
-                  }
-                },
-                "required": ["word"]
-              }
-            },
-            "synonyms": {
-              "type": "array",
-              "title": "Synonyms",
-              "description": "List of synonyms with details.",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "word": {
-                    "type": "string",
-                    "title": "Word",
-                    "description": "A synonym of the main word."
-                  },
-                  "partOfSpeech": {
-                    "type": "string",
-                    "title": "Part of Speech",
-                    "description": "The part of speech of the synonym."
-                  },
-                  "translation": {
-                    "type": "string",
-                    "title": "Translation",
-                    "description": "Vietnamese or native language translation of the synonym."
-                  },
-                  "exampleSentences": {
-                    "type": "array",
-                    "title": "Example Sentences",
-                    "description": "Example sentences using the synonym.",
-                    "items": {
-                      "type": "string"
-                    },
-                    "default": []
-                  }
-                },
-                "required": ["word"]
-              }
-            },
-            "antonyms": {
-              "type": "array",
-              "title": "Antonyms",
-              "description": "List of antonyms with details.",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "word": {
-                    "type": "string",
-                    "title": "Word",
-                    "description": "An antonym of the main word."
-                  },
-                  "partOfSpeech": {
-                    "type": "string",
-                    "title": "Part of Speech",
-                    "description": "The part of speech of the antonym."
-                  },
-                  "translation": {
-                    "type": "string",
-                    "title": "Translation",
-                    "description": "Vietnamese or native language translation of the antonym."
-                  },
-                  "exampleSentences": {
-                    "type": "array",
-                    "title": "Example Sentences",
-                    "description": "Example sentences using the antonym.",
-                    "items": {
-                      "type": "string"
-                    },
-                    "default": []
-                  }
-                },
-                "required": ["word"]
-              }
-            }
-          },
-          "required": ["word", "userID"]
-        },
-        "jsonSample": [
-          {
-            "word": [
-              {
-                "word": "happy",
-                "partOfSpeech": "adjective",
-                "translation": "vui vẻ",
-                "exampleSentences": [
-                  "She feels happy today.",
-                  "It's a happy moment."
-                ]
-              }
-            ],
-            "userID": "user123",
-            "family_word": [
-              {
-                "word": "happiness",
-                "partOfSpeech": "noun",
-                "translation": "hạnh phúc",
-                "exampleSentences": [
-                  "Happiness is important.",
-                  "She found true happiness."
-                ]
-              }
-            ],
-            "synonyms": [
-              {
-                "word": "joyful",
-                "partOfSpeech": "adjective",
-                "translation": "vui vẻ",
-                "exampleSentences": ["He is joyful every morning."]
-              }
-            ],
-            "antonyms": [
-              {
-                "word": "sad",
-                "partOfSpeech": "adjective",
-                "translation": "buồn",
-                "exampleSentences": ["She feels sad after the news."]
-              }
-            ]
-          }
-        ]
-      }
-    },
-
-    "private": {
-      "node_function": {
-        "edge": [
-          {
-            "pipeline": [
-              {
-                "$match": {
-                  "card_id": { "$exists": true, "$type": "string" },
-                  "user_id": { "$exists": true, "$type": "string" }
-                }
-              },
-              {
-                "$lookup": {
-                  "from": "collection_user_login",
-                  "localField": "user_id",
-                  "foreignField": "user_id",
-                  "as": "user_login_data"
-                }
-              },
-              {
-                "$unwind": "$user_login_data"
-              },
-              {
-                "$match": {
-                  "user_login_data.token_login.expires_at": { "$gt": "$$NOW" }
-                }
-              }
-            ],
-            "purpose": "kiểm tra xem người dùng có thẻ hay không",
-            "data_input_from_node": ["collection_user_login"],
-
-            "data_output_to_node": ["collection_save_user_vocabulary"]
-          },
-          {
-            "pipeline": [
-              {
-                "$addFields": {
-                  "createdAt": "$$NOW",
-                  "updatedAt": "$$NOW"
-                }
-              },
-              {
-                "$merge": {
-                  "into": "collection_save_user_vocabulary",
-                  "on": ["userId"],
-                  "whenMatched": "merge",
-                  "whenNotMatched": "insert"
-                }
-              }
-            ],
-            "purpose": "Tạo mới hoặc cập nhật từ vựng người dùng",
-            "data_input_from_node": ["user_input_vocabulary"],
-            "data_output_to_node": ["collection_save_user_vocabulary"]
-          },
-          {
-            "pipeline": [
-              {
-                "$match": {
-                  "userId": { "$exists": true, "$type": "string" }
-                }
-              },
-              {
-                "$lookup": {
-                  "from": "collection_save_user_vocabulary",
-                  "localField": "userId",
-                  "foreignField": "userId",
-                  "as": "user_vocab"
-                }
-              },
-              {
-                "$unwind": "$user_vocab"
-              }
-            ],
-            "purpose": "Lấy danh sách từ vựng người dùng",
-            "data_input_from_node": ["collection_user_login"],
-            "data_output_to_node": ["user_vocab"]
-          },
-          {
-            "pipeline": [
-              {
-                "$match": {
-                  "_id": { "$exists": true, "$type": "objectId" }
-                }
-              },
-              {
-                "$addFields": {
-                  "updatedAt": "$$NOW"
-                }
-              },
-              {
-                "$merge": {
-                  "into": "collection_save_user_vocabulary",
-                  "on": "_id",
-                  "whenMatched": "merge",
-                  "whenNotMatched": "discard"
-                }
-              }
-            ],
-            "purpose": "Cập nhật từ vựng",
-            "data_input_from_node": ["edit_vocabulary"],
-            "data_output_to_node": ["collection_save_user_vocabulary"]
-          },
-          {
-            "pipeline": [
-              {
-                "$match": {
-                  "_id": { "$exists": true, "$type": "objectId" }
-                }
-              },
-              {
-                "$merge": {
-                  "into": "temp_deleted_vocab",
-                  "whenMatched": "merge",
-                  "whenNotMatched": "insert"
-                }
-              }
-            ],
-            "purpose": "Xóa từ vựng người dùng",
-            "data_input_from_node": ["delete_vocabulary"],
-            "data_output_to_node": ["temp_deleted_vocab"]
-          }
-        ]
-      }
-    },
-    "personal": {
-      "node_info": {
-        "name": "English Test System",
-        "author": "Joshept",
-        "version": "1.0",
-        "year": "2025"
-      }
-    }
-  },
-
-  {
     "_id": "collection_materials_user_done",
     "public": {
       "node_data": {
@@ -2651,6 +2313,21 @@
                 }
               }
             },
+            "material_count": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Số lượng bài tập người dùng đã làm trong ngày."
+            },
+            "remaining_attempts": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Số lượt làm bài còn lại của người dùng."
+            },
+            "last_reset_time": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời gian cuối cùng reset hạn ngạch."
+            },
             "is_completed": {
               "type": "boolean",
               "description": "Trạng thái hoàn thành phần thi."
@@ -2664,7 +2341,10 @@
             "part",
             "submission_time",
             "data",
-            "is_completed"
+            "is_completed",
+            "material_count",
+            "remaining_attempts",
+            "last_reset_time"
           ],
           "additionalProperties": false
         },
@@ -2881,6 +2561,192 @@
             ],
             "purpose": "Lưu thông tin chi tiết về phần thi mà người dùng đã hoàn thành vào collection_materials_user_done.",
             "data_input_from_node": ["collection_practice_materials"],
+            "data_output_to_node": ["collection_materials_user_done"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "remaining_attempts": { "$gt": 0 },
+                  "is_completed": false
+                }
+              },
+              {
+                "$addFields": {
+                  "is_data_complete": {
+                    "$allElementsTrue": {
+                      "$map": {
+                        "input": "$data",
+                        "as": "item",
+                        "in": {
+                          "$and": [
+                            { "$ne": ["$$item.question_id", null] },
+                            { "$ne": ["$$item.user_answer", null] }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "is_data_complete": true
+                }
+              },
+              {
+                "$addFields": {
+                  "is_completed": true,
+                  "remaining_attempts": {
+                    "$subtract": ["$remaining_attempts", 1]
+                  },
+                  "material_count": { "$add": ["$material_count", 1] }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_materials_user_done",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Cập nhật is_completed và giảm remaining_attempts khi data đầy đủ.",
+            "data_input_from_node": ["collection_materials_user_done"],
+            "data_output_to_node": ["collection_materials_user_done"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "remaining_attempts": 0,
+                  "is_completed": false
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_user_transactions",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_transactions"
+                }
+              },
+              {
+                "$addFields": {
+                  "has_pending_transaction": {
+                    "$anyElementTrue": {
+                      "$map": {
+                        "input": "$user_transactions",
+                        "as": "transaction",
+                        "in": {
+                          "$and": [
+                            { "$eq": ["$$transaction.status", "pending"] },
+                            {
+                              "$eq": [
+                                "$$transaction.transaction_type",
+                                "payment"
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "has_pending_transaction": false
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Tạo giao dịch thanh toán mới khi remaining_attempts == 0.",
+            "data_input_from_node": ["collection_materials_user_done"],
+            "data_output_to_node": ["collection_user_transactions"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "remaining_attempts": { "$gt": 0 }
+                }
+              },
+              {
+                "$addFields": {
+                  "remaining_attempts": {
+                    "$subtract": ["$remaining_attempts", 1]
+                  },
+                  "material_count": { "$add": ["$material_count", 1] }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_materials_user_done",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Giảm số lượt làm bài còn lại sau khi người dùng hoàn thành một bài tập.",
+            "data_input_from_node": ["collection_materials_user_done"],
+            "data_output_to_node": ["collection_materials_user_done"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "last_reset_time": { "$exists": true },
+                  "$expr": {
+                    "$lt": [
+                      "$last_reset_time",
+                      {
+                        "$add": [
+                          {
+                            "$dateTrunc": {
+                              "date": "$$NOW",
+                              "unit": "day",
+                              "binSize": 1,
+                              "timezone": "Asia/Ho_Chi_Minh"
+                            }
+                          },
+                          { "$literal": 25200000 }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "material_count": 0,
+                  "remaining_attempts": 2,
+                  "last_reset_time": { "$now": [] }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_materials_user_done",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Reset số lượng bài tập và lượt làm bài còn lại vào lúc 7:00 AM hằng ngày.",
+            "data_input_from_node": ["collection_materials_user_done"],
             "data_output_to_node": ["collection_materials_user_done"]
           }
         ]
@@ -3406,6 +3272,344 @@
             "purpose": "Tính tổng điểm và cập nhật kết quả cuối cùng vào collection_user_practice_results.",
             "data_input_from_node": ["collection_user_practice_results"],
             "data_output_to_node": ["collection_user_practice_results"]
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+
+  {
+    "_id": "collection_save_user_vocabulary",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "Save Vocabulary to User Collection",
+          "type": "object",
+          "properties": {
+            "word": {
+              "type": "array",
+              "title": "List of Words",
+              "description": "List of user words with details.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "word": {
+                    "type": "string",
+                    "title": "Word",
+                    "description": "The English word to save.",
+                    "minLength": 1
+                  },
+                  "partOfSpeech": {
+                    "type": "string",
+                    "title": "Part of Speech",
+                    "description": "The part of speech of the word (e.g., noun, verb, adjective)."
+                  },
+                  "translation": {
+                    "type": "string",
+                    "title": "Translation",
+                    "description": "Vietnamese or native language translation of the word."
+                  },
+                  "exampleSentences": {
+                    "type": "array",
+                    "title": "Example Sentences",
+                    "description": "Example sentences using the word.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": []
+                  }
+                },
+                "required": ["word"]
+              }
+            },
+            "userID": {
+              "type": "string",
+              "title": "User ID",
+              "description": "The unique identifier of the user saving the word."
+            },
+            "family_word": {
+              "type": "array",
+              "title": "Family Words",
+              "description": "List of family words with details.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "word": {
+                    "type": "string",
+                    "title": "Word",
+                    "description": "A related word from the same word family."
+                  },
+                  "partOfSpeech": {
+                    "type": "string",
+                    "title": "Part of Speech",
+                    "description": "The part of speech of the family word."
+                  },
+                  "translation": {
+                    "type": "string",
+                    "title": "Translation",
+                    "description": "Vietnamese or native language translation of the family word."
+                  },
+                  "exampleSentences": {
+                    "type": "array",
+                    "title": "Example Sentences",
+                    "description": "Example sentences using the family word.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": []
+                  }
+                },
+                "required": ["word"]
+              }
+            },
+            "synonyms": {
+              "type": "array",
+              "title": "Synonyms",
+              "description": "List of synonyms with details.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "word": {
+                    "type": "string",
+                    "title": "Word",
+                    "description": "A synonym of the main word."
+                  },
+                  "partOfSpeech": {
+                    "type": "string",
+                    "title": "Part of Speech",
+                    "description": "The part of speech of the synonym."
+                  },
+                  "translation": {
+                    "type": "string",
+                    "title": "Translation",
+                    "description": "Vietnamese or native language translation of the synonym."
+                  },
+                  "exampleSentences": {
+                    "type": "array",
+                    "title": "Example Sentences",
+                    "description": "Example sentences using the synonym.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": []
+                  }
+                },
+                "required": ["word"]
+              }
+            },
+            "antonyms": {
+              "type": "array",
+              "title": "Antonyms",
+              "description": "List of antonyms with details.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "word": {
+                    "type": "string",
+                    "title": "Word",
+                    "description": "An antonym of the main word."
+                  },
+                  "partOfSpeech": {
+                    "type": "string",
+                    "title": "Part of Speech",
+                    "description": "The part of speech of the antonym."
+                  },
+                  "translation": {
+                    "type": "string",
+                    "title": "Translation",
+                    "description": "Vietnamese or native language translation of the antonym."
+                  },
+                  "exampleSentences": {
+                    "type": "array",
+                    "title": "Example Sentences",
+                    "description": "Example sentences using the antonym.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "default": []
+                  }
+                },
+                "required": ["word"]
+              }
+            }
+          },
+          "required": ["word", "userID"]
+        },
+        "jsonSample": [
+          {
+            "word": [
+              {
+                "word": "happy",
+                "partOfSpeech": "adjective",
+                "translation": "vui vẻ",
+                "exampleSentences": [
+                  "She feels happy today.",
+                  "It's a happy moment."
+                ]
+              }
+            ],
+            "userID": "user123",
+            "family_word": [
+              {
+                "word": "happiness",
+                "partOfSpeech": "noun",
+                "translation": "hạnh phúc",
+                "exampleSentences": [
+                  "Happiness is important.",
+                  "She found true happiness."
+                ]
+              }
+            ],
+            "synonyms": [
+              {
+                "word": "joyful",
+                "partOfSpeech": "adjective",
+                "translation": "vui vẻ",
+                "exampleSentences": ["He is joyful every morning."]
+              }
+            ],
+            "antonyms": [
+              {
+                "word": "sad",
+                "partOfSpeech": "adjective",
+                "translation": "buồn",
+                "exampleSentences": ["She feels sad after the news."]
+              }
+            ]
+          }
+        ]
+      }
+    },
+
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "card_id": { "$exists": true, "$type": "string" },
+                  "user_id": { "$exists": true, "$type": "string" }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_user_login",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_login_data"
+                }
+              },
+              {
+                "$unwind": "$user_login_data"
+              },
+              {
+                "$match": {
+                  "user_login_data.token_login.expires_at": { "$gt": "$$NOW" }
+                }
+              }
+            ],
+            "purpose": "kiểm tra xem người dùng có thẻ hay không",
+            "data_input_from_node": ["collection_user_login"],
+
+            "data_output_to_node": ["collection_save_user_vocabulary"]
+          },
+          {
+            "pipeline": [
+              {
+                "$addFields": {
+                  "createdAt": "$$NOW",
+                  "updatedAt": "$$NOW"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_save_user_vocabulary",
+                  "on": ["userId"],
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Tạo mới hoặc cập nhật từ vựng người dùng",
+            "data_input_from_node": ["user_input_vocabulary"],
+            "data_output_to_node": ["collection_save_user_vocabulary"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "userId": { "$exists": true, "$type": "string" }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_save_user_vocabulary",
+                  "localField": "userId",
+                  "foreignField": "userId",
+                  "as": "user_vocab"
+                }
+              },
+              {
+                "$unwind": "$user_vocab"
+              }
+            ],
+            "purpose": "Lấy danh sách từ vựng người dùng",
+            "data_input_from_node": ["collection_user_login"],
+            "data_output_to_node": ["user_vocab"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "_id": { "$exists": true, "$type": "objectId" }
+                }
+              },
+              {
+                "$addFields": {
+                  "updatedAt": "$$NOW"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_save_user_vocabulary",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "discard"
+                }
+              }
+            ],
+            "purpose": "Cập nhật từ vựng",
+            "data_input_from_node": ["edit_vocabulary"],
+            "data_output_to_node": ["collection_save_user_vocabulary"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "_id": { "$exists": true, "$type": "objectId" }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "temp_deleted_vocab",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Xóa từ vựng người dùng",
+            "data_input_from_node": ["delete_vocabulary"],
+            "data_output_to_node": ["temp_deleted_vocab"]
           }
         ]
       }
@@ -5312,87 +5516,6 @@
             "pipeline": [
               {
                 "$match": {
-                  "last_reset_time": { "$exists": true },
-                  "$expr": {
-                    "$lt": [
-                      "$last_reset_time",
-                      {
-                        "$add": [
-                          {
-                            "$dateTrunc": {
-                              "date": "$$NOW",
-                              "unit": "day",
-                              "binSize": 1,
-                              "timezone": "Asia/Ho_Chi_Minh"
-                            }
-                          },
-                          { "$literal": 25200000 }
-                        ]
-                      }
-                    ]
-                  }
-                }
-              },
-              {
-                "$addFields": {
-                  "material_count": 0,
-                  "remaining_attempts": 0,
-                  "last_reset_time": { "$now": [] }
-                }
-              },
-              {
-                "$merge": {
-                  "into": "collection_user_quota",
-                  "on": "_id",
-                  "whenMatched": "merge",
-                  "whenNotMatched": "insert"
-                }
-              }
-            ],
-            "purpose": "Reset số lượng bài tập và lượt làm bài còn lại vào lúc 7:00 AM hằng ngày.",
-            "data_input_from_node": ["collection_user_quota"],
-            "data_output_to_node": ["collection_user_quota"]
-          },
-          {
-            "pipeline": [
-              {
-                "$match": {
-                  "user_id": { "$exists": true },
-                  "section": {
-                    "$in": ["listening", "reading", "writing", "speaking"]
-                  },
-                  "submission_time": {
-                    "$gte": { "$date": { "$startOfDay": { "$now": [] } } },
-                    "$lt": { "$now": [] }
-                  }
-                }
-              },
-              {
-                "$group": {
-                  "_id": "$user_id",
-                  "daily_material_count": { "$sum": 1 }
-                }
-              },
-              {
-                "$addFields": {
-                  "can_submit_more": {
-                    "$cond": {
-                      "if": { "$lte": ["$daily_material_count", 2] },
-                      "then": true,
-                      "else": false
-                    }
-                  }
-                }
-              }
-            ],
-            "purpose": "Kiểm tra số lượng bài tập đã làm trong ngày và áp dụng quy tắc thanh toán.",
-            "data_input_from_node": ["collection_materials_user_done"],
-            "data_output_to_node": ["collection_user_quota"]
-          },
-          {
-            "pipeline": [
-              {
-                "$match": {
                   "user_id": { "$exists": true },
                   "transaction_type": "payment",
                   "amount": 10000,
@@ -5400,51 +5523,37 @@
                 }
               },
               {
-                "$addFields": {
-                  "extra_attempts": 5
+                "$lookup": {
+                  "from": "collection_materials_user_done",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_materials"
                 }
               },
               {
-                "$merge": {
-                  "into": "collection_user_quota",
-                  "on": "_id",
-                  "whenMatched": "merge",
-                  "whenNotMatched": "insert"
-                }
-              }
-            ],
-            "purpose": "Mở khóa thêm bài tập sau khi người dùng thanh toán 10k.",
-            "data_input_from_node": ["collection_user_transactions"],
-            "data_output_to_node": ["collection_user_quota"]
-          },
-          {
-            "pipeline": [
-              {
-                "$match": {
-                  "user_id": { "$exists": true },
-                  "remaining_attempts": { "$gt": 0 }
-                }
+                "$unwind": "$user_materials"
               },
               {
                 "$addFields": {
-                  "remaining_attempts": {
-                    "$subtract": ["$remaining_attempts", 1]
+                  "user_materials.remaining_attempts": {
+                    "$add": ["$user_materials.remaining_attempts", 5]
                   }
                 }
               },
               {
                 "$merge": {
-                  "into": "collection_user_quota",
+                  "into": "collection_materials_user_done",
                   "on": "_id",
                   "whenMatched": "merge",
                   "whenNotMatched": "insert"
                 }
               }
             ],
-            "purpose": "Giảm số lượt làm bài còn lại sau khi người dùng hoàn thành một bài tập.",
-            "data_input_from_node": ["collection_user_quota"],
-            "data_output_to_node": ["collection_user_quota"]
+            "purpose": "Mở khóa thêm lượt làm bài sau khi người dùng thanh toán 10k.",
+            "data_input_from_node": ["collection_user_transactions"],
+            "data_output_to_node": ["collection_materials_user_done"]
           },
+
           {
             "pipeline": [
               {
@@ -5454,6 +5563,7 @@
                   "status": "failed"
                 }
               },
+
               {
                 "$lookup": {
                   "from": "collection_practice_materials",
