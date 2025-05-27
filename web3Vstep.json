@@ -5014,6 +5014,14 @@
                   "description": "Thứ hạng của Learner."
                 }
               }
+            },
+            "wants_matching": {
+              "type": "boolean",
+              "description": "Learner có muốn tìm kiếm sự hỗ trợ từ Elite hay không."
+            },
+            "signature": {
+              "type": "string",
+              "description": "Chữ ký số của Learner nếu họ đồng ý matching."
             }
           },
           "required": [
@@ -5023,7 +5031,8 @@
             "matched_at",
             "end_at",
             "status",
-            "log"
+            "log",
+            "wants_matching"
           ],
           "additionalProperties": false
         }
@@ -5032,6 +5041,47 @@
     "private": {
       "node_function": {
         "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "status": "pending",
+                  "wants_matching": true
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "learner_id",
+                  "foreignField": "user_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$addFields": {
+                  "signature": "$card_data.signature",
+                  "is_signature_valid": true
+                }
+              },
+              {
+                "$merge": {
+                  "into": "matching_logs",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Pipeline xử lý matching dựa trên lựa chọn của Learner.",
+            "data_input_from_node": [
+              "matching_elite_learner",
+              "collection_cards"
+            ],
+            "data_output_to_node": "matching_logs"
+          },
           {
             "pipeline": [
               {
@@ -5167,7 +5217,6 @@
       }
     }
   },
-
   {
     "_id": "supporting_feedback",
     "public": {
