@@ -2350,7 +2350,7 @@
         },
         "jsonSample": [
           {
-            "_id": "67b31d2e8a524196aa2d02e7",
+            "_id": "USER123_MATERIAL_DONE",
             "user_id": "USER123",
             "material_id": "MATERIAL123",
             "section": "listening",
@@ -2360,42 +2360,62 @@
               "listening": [
                 {
                   "question_id": "L1",
-                  "user_answer": "B. Travel",
-                  "correct_answer": "B. Travel"
+                  "question_text": "What is the main topic of the conversation?",
+                  "options": [
+                    "The importance of saving money.",
+                    "How to invest in stocks.",
+                    "Tips for planning a vacation.",
+                    "Strategies for starting a business."
+                  ],
+                  "correct_answer": "The importance of saving money.",
+                  "user_answer": "The importance of saving money."
+                },
+                {
+                  "question_id": "L2",
+                  "question_text": "Why does the man want to save money?",
+                  "options": [
+                    "To buy a house.",
+                    "To travel abroad.",
+                    "To start a business.",
+                    "To pay off debts."
+                  ],
+                  "correct_answer": "To buy a house.",
+                  "user_answer": "To travel abroad."
+                },
+                {
+                  "_id": "USER123_MATERIAL_DONE",
+                  "user_id": "USER123",
+                  "material_id": "MATERIAL123",
+                  "section": "listening",
+                  "part": 1,
+                  "submission_time": "2025-02-14T18:26:02.588Z",
+                  "data": {
+                    "listening": [
+                      {
+                        "question_id": "L1",
+                        "question_text": "What is the main topic of the conversation?",
+                        "options": [
+                          "The importance of saving money.",
+                          "How to invest in stocks.",
+                          "Tips for planning a vacation.",
+                          "Strategies for starting a business."
+                        ],
+                        "correct_answer": "The importance of saving money.",
+                        "user_answer": "The importance of saving money."
+                      }
+                    ]
+                  },
+                  "is_completed": true,
+                  "material_count": 2,
+                  "remaining_attempts": 5,
+                  "last_reset_time": "2025-02-14T07:00:00.000Z"
                 }
               ]
             },
-            "is_completed": true
-          },
-          {
-            "_id": "67b31d2e8a524196aa2d02e8",
-            "user_id": "USER123",
-            "material_id": "MATERIAL123",
-            "section": "writing",
-            "part": 1,
-            "submission_time": "2025-02-14T18:26:02.588Z",
-            "data": {
-              "writing": {
-                "prompt": "Write an essay about your goals.",
-                "user_answer": "My goal is to become a successful engineer..."
-              }
-            },
-            "is_completed": true
-          },
-          {
-            "_id": "67b31d2e8a524196aa2d02e9",
-            "user_id": "USER123",
-            "material_id": "MATERIAL123",
-            "section": "speaking",
-            "part": 2,
-            "submission_time": "2025-02-14T18:26:02.588Z",
-            "data": {
-              "speaking": {
-                "prompt": "Describe your last vacation.",
-                "user_audio": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAA..."
-              }
-            },
-            "is_completed": true
+            "is_completed": true,
+            "material_count": 1,
+            "remaining_attempts": 1,
+            "last_reset_time": "2025-02-14T07:00:00.000Z"
           }
         ]
       }
@@ -2688,7 +2708,25 @@
                   "remaining_attempts": {
                     "$subtract": ["$remaining_attempts", 1]
                   },
-                  "material_count": { "$add": ["$material_count", 1] }
+                  "material_count": { "$add": ["$material_count", 1] },
+                  "completed_materials": {
+                    "$concatArrays": [
+                      "$completed_materials",
+                      [
+                        {
+                          "material_id": "MATERIAL1",
+                          "section": "listening",
+                          "submission_time": { "$now": [] },
+                          "data": [
+                            {
+                              "question_id": "L1",
+                              "user_answer": "B. Travel"
+                            }
+                          ]
+                        }
+                      ]
+                    ]
+                  }
                 }
               },
               {
@@ -2700,8 +2738,49 @@
                 }
               }
             ],
-            "purpose": "Giảm số lượt làm bài còn lại sau khi người dùng hoàn thành một bài tập.",
+            "purpose": "Giảm số lượt làm bài còn lại và lưu thông tin bài tập đã hoàn thành.",
             "data_input_from_node": ["collection_materials_user_done"],
+            "data_output_to_node": ["collection_materials_user_done"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "transaction_type": "payment",
+                  "amount": 10000,
+                  "status": "completed"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_materials_user_done",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_materials"
+                }
+              },
+              {
+                "$unwind": "$user_materials"
+              },
+              {
+                "$addFields": {
+                  "user_materials.remaining_attempts": {
+                    "$add": ["$user_materials.remaining_attempts", 5]
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_materials_user_done",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Mở khóa thêm lượt làm bài sau khi người dùng thanh toán 10k.",
+            "data_input_from_node": ["collection_user_transactions"],
             "data_output_to_node": ["collection_materials_user_done"]
           },
           {
@@ -2731,8 +2810,8 @@
               },
               {
                 "$addFields": {
-                  "material_count": 0,
                   "remaining_attempts": 2,
+                  "material_count": 0,
                   "last_reset_time": { "$now": [] }
                 }
               },
