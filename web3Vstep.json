@@ -4725,6 +4725,11 @@
               "required": ["entered_top10_at", "time_in_top10"],
               "description": "History of the user's presence in the top 10."
             },
+            "weeks_out_of_top10": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of consecutive weeks the user has been out of the top 10."
+            },
             "status": {
               "type": "string",
               "enum": ["active", "inactive", "revoked"],
@@ -5009,6 +5014,13 @@
           },
           {
             "pipeline": [
+              {
+                "$addFields": {
+                  "weeks_out_of_top10": {
+                    "$ifNull": ["$weeks_out_of_top10", 0]
+                  }
+                }
+              },
               {
                 "$match": {
                   "status": "active",
