@@ -4105,215 +4105,6 @@
   },
 
   {
-    "_id": "collection_user_writing",
-    "public": {
-      "node_data": {
-        "jsonSchema": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
-          "title": "UserWritingData",
-          "type": "object",
-          "properties": {
-            "_id": {
-              "type": "string",
-              "description": "The unique identifier of the user writing record."
-            },
-            "user_id": {
-              "type": "string",
-              "description": "ID of the user who wrote the essay."
-            },
-            "card_id": {
-              "type": "string",
-              "description": "Card ID associated with the user (nullable if not applicable).",
-              "nullable": true
-            },
-            "topic_id": {
-              "type": "string",
-              "description": "The ID of the randomly selected topic from the writing topics collection."
-            },
-            "written_essay": {
-              "type": "string",
-              "description": "The essay written by the user."
-            },
-            "reactions": {
-              "type": "object",
-              "properties": {
-                "like": {
-                  "type": "integer",
-                  "description": "Number of likes received."
-                },
-                "love": {
-                  "type": "integer",
-                  "description": "Number of loves received."
-                },
-                "wow": {
-                  "type": "integer",
-                  "description": "Number of wows received."
-                },
-                "angry": {
-                  "type": "integer",
-                  "description": "Number of angry reactions received."
-                },
-                "haha": {
-                  "type": "integer",
-                  "description": "Number of haha reactions received."
-                }
-              },
-              "required": ["like", "love", "wow", "angry", "haha"],
-              "additionalProperties": false,
-              "description": "Reactions received for the essay."
-            },
-            "total_score": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 10,
-              "description": "Total score calculated based on reactions."
-            }
-          },
-          "required": [
-            "_id",
-            "user_id",
-            "topic_id",
-            "written_essay",
-            "reactions",
-            "total_score"
-          ],
-          "additionalProperties": false
-        }
-      }
-    },
-    "private": {
-      "node_function": {
-        "edge": [
-          {
-            "pipeline": [
-              {
-                "$match": {
-                  "card_id": { "$exists": true, "$type": "string" },
-                  "user_id": { "$exists": true, "$type": "string" }
-                }
-              },
-              {
-                "$lookup": {
-                  "from": "collection_user_login",
-                  "localField": "user_id",
-                  "foreignField": "user_id",
-                  "as": "user_login_data"
-                }
-              },
-              {
-                "$unwind": "$user_login_data"
-              },
-              {
-                "$match": {
-                  "user_login_data.token_login.expires_at": { "$gt": "$$NOW" }
-                }
-              }
-            ],
-            "purpose": "kiểm tra xem người dùng có thẻ hay không",
-            "data_input_from_node": ["collection_user_login"],
-
-            "data_output_to_node": ["collection_user_writing"]
-          },
-          {
-            "pipeline": [
-              {
-                "$match": {
-                  "status": "active"
-                }
-              },
-              {
-                "$sample": {
-                  "size": 1
-                }
-              },
-              {
-                "$project": {
-                  "_id": 0,
-                  "topic_id": "$_id",
-                  "topic_title": "$title",
-                  "topic_description": "$description"
-                }
-              }
-            ],
-            "purpose": "Chọn ngẫu nhiên một chủ đề từ collection_writing_topics.",
-            "data_input_from_node": ["collection_writing_topics"],
-            "data_output_to_node": ["collection_user_writing"]
-          },
-          {
-            "pipeline": [
-              {
-                "$addFields": {
-                  "total_score": {
-                    "$min": [
-                      10,
-                      {
-                        "$max": [
-                          0,
-                          {
-                            "$subtract": [
-                              {
-                                "$sum": [
-                                  "$reactions.like",
-                                  "$reactions.love",
-                                  "$reactions.wow",
-                                  "$reactions.haha"
-                                ]
-                              },
-                              {
-                                "$multiply": ["$reactions.angry", 2]
-                              }
-                            ]
-                          }
-                        ]
-                      }
-                    ]
-                  }
-                }
-              },
-              {
-                "$project": {
-                  "_id": 1,
-                  "user_id": 1,
-                  "topic_id": 1,
-                  "written_essay": 1,
-                  "reactions": 1,
-                  "total_score": 1
-                }
-              }
-            ],
-            "purpose": "Tính toán tổng điểm dựa trên phản ứng và lưu vào cơ sở dữ liệu.",
-            "data_input_from_node": ["conAI_url"],
-            "data_output_to_node": ["collection_user_writing"]
-          },
-          {
-            "pipeline": [
-              {
-                "$merge": {
-                  "into": "collection_user_writing",
-                  "on": "_id",
-                  "whenMatched": "merge",
-                  "whenNotMatched": "insert"
-                }
-              }
-            ],
-            "purpose": "Lưu kết quả bài thi viết vào collection_user_writing.",
-            "data_input_from_node": ["collection_user_writing"],
-            "data_output_to_node": []
-          }
-        ]
-      }
-    },
-    "personal": {
-      "node_info": {
-        "name": "English Test System",
-        "author": "Joshept",
-        "version": "1.0",
-        "year": "2025"
-      }
-    }
-  },
-
-  {
     "_id": "collection_leaderboard",
     "public": {
       "node_data": {
@@ -4495,7 +4286,7 @@
                     "$sum": "$practice_results.total_score"
                   },
                   "total_writing_score": {
-                    "$sum": "$writing_results.total_score"
+                    "$max": "$writing_results.total_score"
                   }
                 }
               },
@@ -4533,23 +4324,184 @@
               },
               {
                 "$set": {
-                  "leaderboard_score": 0,
                   "rank": null,
+                  "last_rank": "$rank",
+                  "current_streak": 0,
+                  "longest_streak": {
+                    "$max": ["$current_streak", "$longest_streak"]
+                  },
                   "last_reset_time": "$$NOW"
+                }
+              },
+
+              {
+                "$lookup": {
+                  "from": "collection_user_practice_results",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "practice_results"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_user_writing",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "writing_results"
+                }
+              },
+              {
+                "$addFields": {
+                  "total_practice_score": {
+                    "$sum": "$practice_results.total_score"
+                  },
+                  "total_writing_score": {
+                    "$max": "$writing_results.total_score"
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "leaderboard_score": {
+                    "$add": [
+                      { "$multiply": [0.7, "$total_practice_score"] },
+                      { "$multiply": [0.3, "$total_writing_score"] }
+                    ]
+                  }
+                }
+              },
+
+              {
+                "$sort": {
+                  "leaderboard_score": -1
+                }
+              },
+              {
+                "$group": {
+                  "_id": "$leaderboard_score",
+                  "users": {
+                    "$push": {
+                      "user_id": "$user_id",
+                      "score": "$leaderboard_score"
+                    }
+                  }
+                }
+              },
+              {
+                "$sort": {
+                  "_id": -1
+                }
+              },
+              {
+                "$group": {
+                  "_id": null,
+                  "all_users": {
+                    "$push": {
+                      "score_group": "$_id",
+                      "users": "$users"
+                    }
+                  }
+                }
+              },
+              {
+                "$unwind": {
+                  "path": "$all_users",
+                  "includeArrayIndex": "rank_index"
+                }
+              },
+              {
+                "$unwind": "$all_users.users"
+              },
+              {
+                "$addFields": {
+                  "rank": {
+                    "$add": [
+                      {
+                        "$multiply": [
+                          "$rank_index",
+                          { "$size": "$all_users.users" }
+                        ]
+                      },
+                      {
+                        "$indexOfArray": [
+                          "$all_users.users.user_id",
+                          "$all_users.users.user_id"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+
+              {
+                "$set": {
+                  "current_streak": {
+                    "$cond": {
+                      "if": { "$eq": ["$rank", "$last_rank"] },
+                      "then": { "$add": ["$current_streak", 1] },
+                      "else": 1
+                    }
+                  },
+                  "longest_streak": {
+                    "$max": ["$current_streak", "$longest_streak"]
+                  },
+                  "top10_history": {
+                    "$cond": {
+                      "if": { "$lte": ["$rank", 10] },
+                      "then": {
+                        "entered_top10_at": {
+                          "$ifNull": [
+                            "$top10_history.entered_top10_at",
+                            "$$NOW"
+                          ]
+                        },
+                        "time_in_top10": {
+                          "$cond": {
+                            "if": {
+                              "$ifNull": [
+                                "$top10_history.entered_top10_at",
+                                false
+                              ]
+                            },
+                            "then": {
+                              "$divide": [
+                                {
+                                  "$subtract": [
+                                    "$$NOW",
+                                    "$top10_history.entered_top10_at"
+                                  ]
+                                },
+                                86400000
+                              ]
+                            },
+                            "else": 0
+                          }
+                        }
+                      },
+                      "else": {
+                        "entered_top10_at": null,
+                        "time_in_top10": 0
+                      }
+                    }
+                  }
                 }
               },
               {
                 "$merge": {
                   "into": "collection_leaderboard",
-                  "on": "_id",
-                  "whenMatched": "replace",
+                  "on": "user_id",
+                  "whenMatched": "merge",
                   "whenNotMatched": "insert"
                 }
               }
             ],
-            "purpose": "Reset dữ liệu leaderboard vào mỗi sáng thứ 2 lúc 2h sáng",
-            "data_input_from_node": ["collection_leaderboard"],
-            "data_output_to_node": []
+            "purpose": "Tự động tính toán và cập nhật leaderboard vào sáng thứ Hai lúc 2:00 AM",
+            "data_input_from_node": [
+              "collection_user_practice_results",
+              "collection_user_writing",
+              "collection_leaderboard"
+            ],
+            "data_output_to_node": ["collection_leaderboard"]
           },
           {
             "pipeline": [
@@ -4597,6 +4549,82 @@
                   },
                   "last_rank": "$rank"
                 }
+              },
+              {
+                "pipeline": [
+                  {
+                    "$sort": {
+                      "leaderboard_score": -1
+                    }
+                  },
+                  {
+                    "$group": {
+                      "_id": "$leaderboard_score",
+                      "users": {
+                        "$push": {
+                          "user_id": "$user_id",
+                          "score": "$leaderboard_score"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "$sort": {
+                      "_id": -1
+                    }
+                  },
+                  {
+                    "$group": {
+                      "_id": null,
+                      "all_users": {
+                        "$push": {
+                          "score_group": "$_id",
+                          "users": "$users"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "$unwind": {
+                      "path": "$all_users",
+                      "includeArrayIndex": "rank_index"
+                    }
+                  },
+                  {
+                    "$unwind": "$all_users.users"
+                  },
+                  {
+                    "$addFields": {
+                      "rank": {
+                        "$add": [
+                          {
+                            "$multiply": [
+                              "$rank_index",
+                              { "$size": "$all_users.users" }
+                            ]
+                          },
+                          {
+                            "$indexOfArray": [
+                              "$all_users.users.user_id",
+                              "$all_users.users.user_id"
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "$merge": {
+                      "into": "collection_leaderboard",
+                      "on": "user_id",
+                      "whenMatched": "merge",
+                      "whenNotMatched": "insert"
+                    }
+                  }
+                ],
+                "purpose": "Cập nhật rank và lịch sử trụ hạng của người dùng",
+                "data_input_from_node": ["collection_leaderboard"],
+                "data_output_to_node": []
               },
               {
                 "$set": {
