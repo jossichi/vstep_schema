@@ -177,6 +177,50 @@
             "purpose": "Create physical wallet and hash studentID without storing the original studentID.",
             "data_input_from_node": [],
             "data_output_to_node": []
+          },
+          {
+            "pipeline": [
+              {
+                "$lookup": {
+                  "from": "collection_leaderboard",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "leaderboard_entry"
+                }
+              },
+
+              {
+                "$match": {
+                  "leaderboard_entry": { "$size": 0 }
+                }
+              },
+
+              {
+                "$project": {
+                  "_id": 0,
+                  "user_id": 1,
+                  "leaderboard_score": { "$const": null },
+                  "rank": { "$const": null },
+                  "current_streak": { "$const": null },
+                  "longest_streak": { "$const": null },
+                  "last_rank": { "$const": null },
+                  "top10_history": {
+                    "entered_top10_at": { "$const": null },
+                    "time_in_top10": { "$const": 0 }
+                  },
+                  "last_reset_time": { "$const": null }
+                }
+              },
+
+              {
+                "$merge": {
+                  "into": "collection_leaderboard",
+                  "on": "user_id",
+                  "whenMatched": "keepExisting",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ]
           }
         ]
       }
@@ -4803,48 +4847,11 @@
               "discounts": true
             },
             "top10_history": {
-              "entered_top10_at": "2025-02-01T00:00:00.000Z",
-              "time_in_top10": 21
+              "entered_top10_at": "2025-02-14T18:26:02.588Z",
+              "time_in_top10": 7
             },
+            "weeks_out_of_top10": 0,
             "status": "active",
-            "revocation_reason": null,
-            "revocation_date": null,
-            "last_verification_date": "2025-02-14T18:26:02.588Z"
-          },
-          {
-            "_id": "ELITE_002",
-            "user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-            "is_elite_partner": false,
-            "eligible_for_elite": false,
-            "elite_benefits": {
-              "exclusive_content": false,
-              "priority_support": false,
-              "discounts": false
-            },
-            "top10_history": {
-              "entered_top10_at": "2025-02-05T00:00:00.000Z",
-              "time_in_top10": 10
-            },
-            "status": "revoked",
-            "revocation_reason": "Fell out of top 10 for 3 consecutive weeks.",
-            "revocation_date": "2025-02-21T00:00:00.000Z",
-            "last_verification_date": "2025-02-14T18:26:02.588Z"
-          },
-          {
-            "_id": "ELITE_003",
-            "user_id": "f9e8d7c6-b5a4-3210-9876-543210fedcba",
-            "is_elite_partner": false,
-            "eligible_for_elite": false,
-            "elite_benefits": {
-              "exclusive_content": false,
-              "priority_support": false,
-              "discounts": false
-            },
-            "top10_history": {
-              "entered_top10_at": null,
-              "time_in_top10": 0
-            },
-            "status": "inactive",
             "revocation_reason": null,
             "revocation_date": null,
             "last_verification_date": "2025-02-14T18:26:02.588Z"
@@ -4930,51 +4937,7 @@
             "data_input_from_node": ["collection_leaderboard"],
             "data_output_to_node": ["elite_partners"]
           },
-          {
-            "pipeline": [
-              {
-                "$match": {
-                  "rank": { "$lte": 10 },
-                  "top10_history.time_in_top10": { "$gte": 14 }
-                }
-              },
-              {
-                "$lookup": {
-                  "from": "collection_leaderboard",
-                  "localField": "user_id",
-                  "foreignField": "user_id",
-                  "as": "leaderboard_data"
-                }
-              },
-              {
-                "$addFields": {
-                  "eligible_for_elite": {
-                    "$cond": {
-                      "if": {
-                        "$and": [
-                          { "$lte": ["$rank", 10] },
-                          { "$gte": ["$top10_history.time_in_top10", 14] }
-                        ]
-                      },
-                      "then": true,
-                      "else": false
-                    }
-                  }
-                }
-              },
-              {
-                "$merge": {
-                  "into": "elite_partners",
-                  "on": "user_id",
-                  "whenMatched": "merge",
-                  "whenNotMatched": "insert"
-                }
-              }
-            ],
-            "purpose": "Xét điều kiện để trở thành Elite Partner",
-            "data_input_from_node": ["collection_leaderboard"],
-            "data_output_to_node": ["elite_partners"]
-          },
+
           {
             "pipeline": [
               {
@@ -4989,19 +4952,22 @@
                 "$unwind": "$card_data"
               },
               {
-                "$addFields": {
-                  "is_signature_valid": {
-                    "$function": {
-                      "body": "function(signature, public_key, qr_code) { const crypto = require('crypto'); const verify = crypto.createVerify('SHA256'); verify.update(qr_code); return verify.verify(public_key, signature, 'base64'); }",
-                      "args": [
-                        "$card_data.signature",
-                        "$card_data.public_key",
-                        "$card_data.qr_code"
-                      ],
-                      "lang": "js"
+                "$lookup": {
+                  "from": "collection_cards",
+                  "let": {},
+                  "pipeline": [
+                    {
+                      "$group": {
+                        "_id": null,
+                        "all_signatures": { "$push": "$signature" }
+                      }
                     }
-                  }
+                  ],
+                  "as": "all_card_signatures"
                 }
+              },
+              {
+                "$unwind": "$all_card_signatures"
               },
               {
                 "$addFields": {
@@ -5205,13 +5171,14 @@
             "pipeline": [
               {
                 "$match": {
-                  "status": "active",
-                  "is_elite_partner": true
+                  "is_elite_partner": true,
+                  "status": "active"
                 }
               },
+
               {
                 "$lookup": {
-                  "from": "leaderboard",
+                  "from": "collection_leaderboard",
                   "localField": "user_id",
                   "foreignField": "user_id",
                   "as": "leaderboard_data"
@@ -5225,17 +5192,23 @@
                   "elite_rank": "$leaderboard_data.rank"
                 }
               },
+
               {
                 "$lookup": {
-                  "from": "leaderboard",
-                  "let": { "elite_rank": "$elite_rank" },
+                  "from": "collection_leaderboard",
+                  "let": { "current_user_id": "$user_id" },
                   "pipeline": [
                     {
                       "$match": {
                         "$expr": {
                           "$and": [
-                            { "$gt": ["$rank", "$$elite_rank"] },
-                            { "$lte": ["$rank", 20] }
+                            { "$ne": ["$user_id", "$$current_user_id"] },
+                            {
+                              "$or": [
+                                { "$gt": ["$rank", 20] },
+                                { "$eq": ["$rank", null] }
+                              ]
+                            }
                           ]
                         }
                       }
@@ -5247,6 +5220,7 @@
               {
                 "$unwind": "$eligible_learners"
               },
+
               {
                 "$lookup": {
                   "from": "matching_logs",
@@ -5265,6 +5239,7 @@
                   "current_match_count": { "$lt": 3 }
                 }
               },
+
               {
                 "$lookup": {
                   "from": "matching_logs",
@@ -5274,10 +5249,18 @@
                 }
               },
               {
-                "$match": {
-                  "learner_existing_matches": { "$size": 0 }
+                "$addFields": {
+                  "learner_existing_match_count": {
+                    "$size": "$learner_existing_matches"
+                  }
                 }
               },
+              {
+                "$match": {
+                  "learner_existing_match_count": 0
+                }
+              },
+
               {
                 "$addFields": {
                   "learner_id": "$eligible_learners.user_id",
@@ -5290,12 +5273,22 @@
                       "amount": 1
                     }
                   },
-                  "status": "active"
+                  "status": "pending",
+                  "wants_matching": true
                 }
               },
+
               {
                 "$project": {
-                  "_id": 0,
+                  "_id": {
+                    "$concat": [
+                      "$user_id",
+                      "_",
+                      "$eligible_learners.user_id",
+                      "_",
+                      { "$toString": "$$NOW" }
+                    ]
+                  },
                   "elite_id": "$user_id",
                   "learner_id": 1,
                   "matched_at": 1,
@@ -5304,9 +5297,12 @@
                   "log": {
                     "elite_rank": "$elite_rank",
                     "learner_rank": "$learner_rank"
-                  }
+                  },
+                  "wants_matching": 1,
+                  "signature": "$eligible_learners.user_id"
                 }
               },
+
               {
                 "$merge": {
                   "into": "matching_logs",
