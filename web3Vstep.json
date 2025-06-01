@@ -5588,6 +5588,204 @@
       }
     }
   },
+  {
+    "_id": "collection_recharge_codes",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "RechargeCodeData",
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "description": "ID duy nhất của mã nạp tiền."
+            },
+            "code": {
+              "type": "string",
+              "unique": true,
+              "description": "Mã nạp tiền duy nhất (tự động tạo)."
+            },
+            "amount": {
+              "type": "integer",
+              "enum": [10000, 20000, 50000, 100000, 200000, 500000],
+              "description": "Giá trị tiền được nạp khi sử dụng mã này (đơn vị VND)."
+            },
+            "status": {
+              "type": "string",
+              "enum": ["active", "used"],
+              "description": "Trạng thái của mã nạp tiền."
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời gian tạo mã nạp tiền."
+            },
+            "used_at": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true,
+              "description": "Thời điểm mã nạp tiền được sử dụng."
+            }
+          },
+          "required": ["_id", "code", "amount", "status", "created_at"],
+          "additionalProperties": false
+        },
+        "jsonSample": [
+          {
+            "_id": "CODE001",
+            "code": "A1B2C3",
+            "amount": 10000,
+            "status": "active",
+            "created_at": "2025-02-14T18:26:02.588Z",
+            "used_at": null
+          },
+          {
+            "_id": "CODE002",
+            "code": "D4E5F6",
+            "amount": 20000,
+            "status": "active",
+            "created_at": "2025-02-14T18:27:15.345Z",
+            "used_at": null
+          },
+          {
+            "_id": "CODE003",
+            "code": "G7H8I9",
+            "amount": 50000,
+            "status": "active",
+            "created_at": "2025-02-14T18:28:45.789Z",
+            "used_at": null
+          },
+          {
+            "_id": "CODE004",
+            "code": "J1K2L3",
+            "amount": 100000,
+            "status": "active",
+            "created_at": "2025-02-14T18:30:12.234Z",
+            "used_at": null
+          },
+          {
+            "_id": "CODE005",
+            "code": "M4N5O6",
+            "amount": 200000,
+            "status": "active",
+            "created_at": "2025-02-14T18:31:56.678Z",
+            "used_at": null
+          },
+          {
+            "_id": "CODE006",
+            "code": "P7Q8R9",
+            "amount": 500000,
+            "status": "active",
+            "created_at": "2025-02-14T18:33:22.123Z",
+            "used_at": null
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$addFields": {
+                  "code": {
+                    "$function": {
+                      "body": "function() { const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let result = ''; for (let i = 0; i < 6; i++) { result += characters.charAt(Math.floor(Math.random() * characters.length)); } return result; }",
+                      "args": [],
+                      "lang": "js"
+                    }
+                  },
+                  "status": "active",
+                  "created_at": "$$NOW"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_recharge_codes",
+                  "on": "code",
+                  "whenMatched": "fail",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Tạo mã nạp tiền mới và thêm vào collection_recharge_codes.",
+            "data_input_from_node": [],
+            "data_output_to_node": ["collection_recharge_codes"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "code": { "$exists": true },
+                  "status": "active"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "user_id_used",
+                  "foreignField": "user_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$addFields": {
+                  "updated_balance": {
+                    "$add": ["$card_data.balance", "$amount"]
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_cards",
+                  "on": "card_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$set": {
+                  "status": "used",
+                  "used_at": "$$NOW",
+                  "user_id_used": "$user_id"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_recharge_codes",
+                  "on": "code",
+                  "whenMatched": "replace",
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$match": {
+                  "status": "used"
+                }
+              },
+              {
+                "$out": "collection_recharge_codes_archive"
+              }
+            ],
+            "purpose": "Xử lý mã nạp tiền, cập nhật số dư và xóa mã đã sử dụng.",
+            "data_input_from_node": [
+              "collection_recharge_codes",
+              "collection_cards"
+            ],
+            "data_output_to_node": [
+              "collection_cards",
+              "collection_recharge_codes_archive"
+            ]
+          }
+        ]
+      }
+    }
+  },
 
   {
     "_id": "collection_user_transactions",
