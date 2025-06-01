@@ -5644,6 +5644,22 @@
               "type": "string",
               "enum": ["pending", "completed", "failed"],
               "description": "Trạng thái của giao dịch."
+            },
+            "steps": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "step_id": { "type": "string" },
+                  "attempts_added": { "type": "integer" },
+                  "status": {
+                    "type": "string",
+                    "enum": ["pending", "completed", "refunded"]
+                  },
+                  "verified_at": { "type": "string", "format": "date-time" }
+                }
+              },
+              "description": "Các bước giao dịch trong chuỗi blockchain-style."
             }
           },
           "required": [
@@ -5653,7 +5669,8 @@
             "amount",
             "description",
             "created_at",
-            "status"
+            "status",
+            "steps"
           ],
           "additionalProperties": false
         },
@@ -5681,9 +5698,95 @@
               {
                 "$match": {
                   "user_id": { "$exists": true },
+                  "card_id": { "$exists": true }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "card_id",
+                  "foreignField": "card_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$addFields": {
+                  "is_balance_sufficient": {
+                    "$gte": ["$card_data.balance", "$amount"]
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Kiểm tra số dư trong collection_cards.balance trước khi thanh toán.",
+            "data_input_from_node": ["collection_user_transactions"],
+            "data_output_to_node": ["collection_user_transactions"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
                   "transaction_type": "payment",
                   "amount": 10000,
-                  "status": "completed"
+                  "status": "pending",
+                  "steps.status": "pending"
+                }
+              },
+              {
+                "$unwind": "$steps"
+              },
+              {
+                "$match": {
+                  "steps.status": "pending"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "card_id",
+                  "foreignField": "card_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$set": {
+                  "is_balance_sufficient": {
+                    "$gte": [
+                      "$card_data.balance",
+                      { "$divide": ["$amount", 5] }
+                    ]
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "is_balance_sufficient": true
+                }
+              },
+              {
+                "$set": {
+                  "card_data.balance": {
+                    "$subtract": [
+                      "$card_data.balance",
+                      { "$divide": ["$amount", 5] }
+                    ]
+                  },
+                  "steps.$[step].status": "completed",
+                  "steps.$[step].verified_at": "$$NOW"
                 }
               },
               {
@@ -5698,26 +5801,129 @@
                 "$unwind": "$user_materials"
               },
               {
-                "$addFields": {
+                "$set": {
                   "user_materials.remaining_attempts": {
-                    "$add": ["$user_materials.remaining_attempts", 5]
+                    "$add": ["$user_materials.remaining_attempts", 1]
                   }
                 }
               },
               {
                 "$merge": {
+                  "into": "collection_cards",
+                  "on": "card_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$merge": {
                   "into": "collection_materials_user_done",
+                  "on": "user_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
                   "on": "_id",
                   "whenMatched": "merge",
                   "whenNotMatched": "insert"
                 }
               }
             ],
-            "purpose": "Mở khóa thêm lượt làm bài sau khi người dùng thanh toán 10k.",
+            "purpose": "Xử lý từng bước trong chuỗi giao dịch blockchain-style, trừ tiền từ collection_cards.balance và tăng remaining_attempts.",
             "data_input_from_node": ["collection_user_transactions"],
+            "data_output_to_node": [
+              "collection_cards",
+              "collection_materials_user_done",
+              "collection_user_transactions"
+            ]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "remaining_attempts": { "$gt": 0 }
+                }
+              },
+              {
+                "$set": {
+                  "remaining_attempts": 2
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_materials_user_done",
+                  "on": "user_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Reset remaining_attempts về 2 nếu người dùng không sử dụng hết.",
+            "data_input_from_node": ["collection_materials_user_done"],
             "data_output_to_node": ["collection_materials_user_done"]
           },
-
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "steps.status": "pending"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "card_id",
+                  "foreignField": "card_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$set": {
+                  "card_data.balance": {
+                    "$add": [
+                      "$card_data.balance",
+                      {
+                        "$multiply": [
+                          { "$size": "$steps" },
+                          { "$divide": ["$amount", 5] }
+                        ]
+                      }
+                    ]
+                  },
+                  "steps.$[].status": "refunded"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_cards",
+                  "on": "card_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Hoàn tiền cho người dùng nếu block không hoàn thành.",
+            "data_input_from_node": ["collection_user_transactions"],
+            "data_output_to_node": [
+              "collection_cards",
+              "collection_user_transactions"
+            ]
+          },
           {
             "pipeline": [
               {
