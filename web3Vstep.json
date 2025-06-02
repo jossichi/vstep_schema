@@ -53,6 +53,11 @@
               "format": "date-time",
               "description": "Thời gian tạo thẻ"
             },
+            "user_OTP": {
+              "bsonType": "string",
+              "pattern": "^[0-9]{6}$",
+              "description": "Mã OTP do người dùng nhập, phải là số có 6 chữ số."
+            },
             "hashed_studentID": {
               "type": "string",
               "unique": true,
@@ -220,78 +225,24 @@
                   "whenNotMatched": "insert"
                 }
               }
-            ]
-          }
-        ]
-      }
-    },
-    "personal": {
-      "node_info": {
-        "name": "English Test System",
-        "author": "Joshept",
-        "version": "1.0",
-        "year": "2025"
-      }
-    }
-  },
-
-  {
-    "_id": "blocked_cards",
-    "public": {
-      "node_data": {
-        "jsonSchema": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
-          "title": "BlockedCardSchema",
-          "type": "object",
-          "properties": {
-            "_id": { "type": "string" },
-            "card_id": {
-              "type": "string",
-              "description": "Tham chiếu đến `card_id` trong `collection_cards`"
-            },
-            "user_id": {
-              "type": "string",
-              "description": "Tham chiếu đến `user_id` trong `collection_cards`"
-            },
-            "reason": {
-              "type": "string",
-              "description": "Lý do bị chặn (do admin nhập)"
-            },
-            "blocked_at": {
-              "type": "string",
-              "format": "date-time",
-              "description": "Thời gian bị chặn"
-            },
-            "unblock_date": {
-              "type": "string",
-              "format": "date-time",
-              "description": "Thời hạn gỡ chặn (nếu có)"
-            }
+            ],
+            "purpose": "Add user to leaderboard if not already present.",
+            "data_input_from_node": [],
+            "data_output_to_node": []
           },
-          "required": ["_id", "card_id", "user_id", "reason", "blocked_at"]
-        },
-        "jsonSample": [
-          {
-            "_id": "BLOCKED_001",
-            "card_id": "C123456789",
-            "user_id": "USER123",
-            "reason": "Vi phạm chính sách sử dụng",
-            "blocked_at": "2025-02-14T18:26:02.588Z",
-            "unblock_date": "2025-03-14T18:26:02.588Z"
-          }
-        ]
-      }
-    },
-    "private": {
-      "node_function": {
-        "edge": [
           {
             "pipeline": [
               {
+                "$match": {
+                  "user_OTP": { "$exists": true },
+                  "transaction_type": "payment"
+                }
+              },
+              {
                 "$lookup": {
                   "from": "collection_cards",
-                  "localField": "card_id",
-                  "foreignField": "card_id",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
                   "as": "card_data"
                 }
               },
@@ -299,79 +250,27 @@
                 "$unwind": "$card_data"
               },
               {
-                "$lookup": {
-                  "from": "collection_cards",
-                  "localField": "user_id",
-                  "foreignField": "user_id",
-                  "as": "user_data"
-                }
-              },
-              {
-                "$unwind": "$user_data"
-              },
-
-              {
-                "$lookup": {
-                  "from": "admin_blocked_cards",
-                  "localField": "card_id",
-                  "foreignField": "card_id",
-                  "as": "admin_block_info"
-                }
-              },
-              {
-                "$unwind": "$admin_block_info"
-              },
-              {
                 "$match": {
-                  "$expr": {
-                    "$and": [
-                      { "$eq": ["$card_id", "$admin_block_info.card_id"] },
-                      { "$eq": ["$user_id", "$admin_block_info.user_id"] },
-                      { "$eq": ["$admin_block_info.status", "blocked"] }
-                    ]
-                  }
+                  "card_data.user_OTP": "$OTP_input"
                 }
               },
-
               {
-                "$addFields": {
-                  "reason": "$reason_input",
-                  "blocked_at": "$$NOW",
-                  "unblock_date": {
-                    "$cond": {
-                      "if": { "$ne": ["$unblock_date_input", null] },
-                      "then": "$unblock_date_input",
-                      "else": null
-                    }
-                  }
+                "$set": {
+                  "signature": "$card_data.signature"
                 }
               },
-
-              {
-                "$project": {
-                  "admin_block_info": 0,
-                  "card_data": 0,
-                  "user_data": 0
-                }
-              },
-
               {
                 "$merge": {
-                  "into": "blocked_cards",
+                  "into": "collection_user_transactions",
                   "on": "_id",
-                  "whenMatched": "replace",
+                  "whenMatched": "merge",
                   "whenNotMatched": "insert"
                 }
               }
             ],
-            "purpose": "Lưu trữ thông tin chặn thẻ người dùng mà không lưu thông tin admin",
-            "data_input_from_node": [
-              "card_id",
-              "user_id",
-              "reason_input",
-              "unblock_date_input"
-            ],
-            "data_output_to_node": ["blocked_at", "unblock_date"]
+            "purpose": "Xác thực giao dịch thanh toán bằng OTP và lưu vào collection_user_transactions.",
+            "data_input_from_node": [],
+            "data_output_to_node": []
           }
         ]
       }
@@ -2853,9 +2752,66 @@
                 }
               },
               {
+                "$lookup": {
+                  "from": "collection_materials_user_done",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_materials"
+                }
+              },
+              {
+                "$unwind": "$user_materials"
+              },
+              {
                 "$addFields": {
-                  "remaining_attempts": 2,
-                  "material_count": 0,
+                  "refund_amount": {
+                    "$multiply": [
+                      {
+                        "$subtract": [5, "$user_materials.remaining_attempts"]
+                      },
+                      2000
+                    ]
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "refund_amount": { "$gt": 0 }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_cards",
+                  "on": "user_id",
+                  "whenMatched": [
+                    {
+                      "$set": {
+                        "balance": { "$add": ["$balance", "$refund_amount"] }
+                      }
+                    }
+                  ],
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": [
+                    {
+                      "$set": {
+                        "refund_amount": "$refund_amount",
+                        "refund_time": "$$NOW",
+                        "status": "refunded"
+                      }
+                    }
+                  ],
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$set": {
+                  "user_materials.remaining_attempts": 0,
                   "last_reset_time": { "$now": [] }
                 }
               },
@@ -2884,7 +2840,6 @@
       }
     }
   },
-
   {
     "_id": "collection_user_practice_results",
     "public": {
@@ -5723,6 +5678,51 @@
                 }
               },
               {
+                "$addFields": {
+                  "status": "used",
+                  "used_at": "$$NOW",
+                  "user_id_used": "$user_id"
+                }
+              },
+              {
+                "$project": {
+                  "_id": 1,
+                  "code": 1,
+                  "user_id": 1,
+                  "amount": 1,
+                  "status": 1,
+                  "used_at": 1,
+                  "user_id_used": 1
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_recharge_codes",
+                  "on": "_id",
+                  "whenMatched": "replace",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Xử lý mã nạp tiền.",
+            "data_input_from_node": [
+              "collection_recharge_codes",
+              "collection_cards"
+            ],
+            "data_output_to_node": [
+              "collection_cards",
+              "collection_recharge_codes_archive"
+            ]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "code": { "$exists": true },
+                  "status": "used"
+                }
+              },
+              {
                 "$lookup": {
                   "from": "collection_cards",
                   "localField": "user_id_used",
@@ -5731,48 +5731,49 @@
                 }
               },
               {
-                "$unwind": "$card_data"
+                "$unwind": {
+                  "path": "$card_data",
+                  "preserveNullAndEmptyArrays": false
+                }
               },
               {
-                "$addFields": {
-                  "updated_balance": {
-                    "$add": ["$card_data.balance", "$amount"]
-                  }
+                "$project": {
+                  "_id": "$card_data._id",
+                  "__v": "$card_data.__v",
+                  "card_id": "$card_data.card_id",
+                  "created_at": "$card_data.created_at",
+                  "createdAt": "$card_data.createdAt",
+                  "device_id": "$card_data.device_id",
+                  "hashed_studentID": "$card_data.hashed_studentID",
+                  "public_key": "$card_data.public_key",
+                  "qr_code": "$card_data.qr_code",
+                  "signature": "$card_data.signature",
+                  "status": "$card_data.status",
+                  "token": "$card_data.token",
+                  "user_id": "$card_data.user_id",
+                  "balance": "$updated_balance",
+                  "updatedAt": "$$NOW"
                 }
               },
               {
                 "$merge": {
                   "into": "collection_cards",
-                  "on": "card_id",
+                  "on": "_id",
                   "whenMatched": "merge",
                   "whenNotMatched": "insert"
                 }
               },
               {
-                "$set": {
-                  "status": "used",
-                  "used_at": "$$NOW",
-                  "user_id_used": "$user_id"
-                }
-              },
-              {
                 "$merge": {
-                  "into": "collection_recharge_codes",
-                  "on": "code",
+                  "into": "collection_recharge_codes_archive",
+                  "on": "_id",
                   "whenMatched": "replace",
                   "whenNotMatched": "insert"
                 }
-              },
-              {
-                "$match": {
-                  "status": "used"
-                }
-              },
-              {
-                "$out": "collection_recharge_codes_archive"
               }
             ],
-            "purpose": "Xử lý mã nạp tiền, cập nhật số dư và xóa mã đã sử dụng.",
+
+            "purpose": "cập nhật số dư và xóa mã đã sử dụng.",
             "data_input_from_node": [
               "collection_recharge_codes",
               "collection_cards"
@@ -5813,7 +5814,7 @@
             "amount": {
               "type": "integer",
               "minimum": 10000,
-              "maximum": 10000,
+              "maximum": 1000000,
               "description": "Số tiền liên quan đến giao dịch (đơn vị VND)."
             },
             "description": {
@@ -5842,22 +5843,6 @@
               "type": "string",
               "enum": ["pending", "completed", "failed"],
               "description": "Trạng thái của giao dịch."
-            },
-            "steps": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "step_id": { "type": "string" },
-                  "attempts_added": { "type": "integer" },
-                  "status": {
-                    "type": "string",
-                    "enum": ["pending", "completed", "refunded"]
-                  },
-                  "verified_at": { "type": "string", "format": "date-time" }
-                }
-              },
-              "description": "Các bước giao dịch trong chuỗi blockchain-style."
             }
           },
           "required": [
@@ -5867,23 +5852,36 @@
             "amount",
             "description",
             "created_at",
-            "status",
-            "steps"
+            "status"
           ],
           "additionalProperties": false
         },
         "jsonSample": [
           {
-            "_id": "TXN123456789",
-            "user_id": "USER123",
-            "transaction_type": "payment",
+            "_id": "txn_1234567890",
+            "user_id": "user_abc123",
+            "transaction_type": "deposit",
             "amount": 10000,
-            "description": "Thanh toán để làm thêm 5 bài tập.",
-            "created_at": "2025-02-14T19:00:00.000Z",
-            "card_id": "CARD123",
-            "signature": "SIGNATURE123",
-            "public_key": "PUBLICKEY123",
-            "status": "completed"
+            "description": "Nạp tiền qua mã QR thẻ vật lý",
+            "created_at": "2025-06-01T10:15:00Z",
+            "card_id": "card_9876543210",
+            "signature": "MEUCIQDf5x9RbK5G0nQ5G4ZkM3ztzvVv...TớiCuốiChữKý==",
+            "public_key": "04c5ab3d17b67f938c0f467feef9a2f1be...KhóaDàiTớiCuối",
+            "status": "completed",
+            "steps": [
+              {
+                "step_id": "step1",
+                "attempts_added": 1,
+                "status": "completed",
+                "verified_at": "2025-06-01T10:16:00Z"
+              },
+              {
+                "step_id": "step2",
+                "attempts_added": 2,
+                "status": "completed",
+                "verified_at": "2025-06-01T10:17:30Z"
+              }
+            ]
           }
         ]
       }
@@ -5928,6 +5926,48 @@
             ],
             "purpose": "Kiểm tra số dư trong collection_cards.balance trước khi thanh toán.",
             "data_input_from_node": ["collection_user_transactions"],
+            "data_output_to_node": ["collection_user_transactions"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_OTP": { "$exists": true },
+                  "transaction_type": "payment"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$match": {
+                  "card_data.user_OTP": "$OTP_input"
+                }
+              },
+              {
+                "$set": {
+                  "signature": "$card_data.signature"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Xác thực giao dịch bằng OTP và chữ ký số.",
+            "data_input_from_node": ["collection_cards"],
             "data_output_to_node": ["collection_user_transactions"]
           },
           {
@@ -6194,49 +6234,51 @@
               "minimum": 0,
               "description": "Tổng số tiền nạp vào hệ thống trong ngày."
             },
-            "system_share": {
+            "system_share_gross": {
               "type": "integer",
               "minimum": 0,
-              "description": "Phần doanh thu thuộc về hệ thống (80%)."
+              "description": "Phần doanh thu thuộc về hệ thống trước thuế (70%)."
             },
-            "admin_share": {
+            "admin_share_gross": {
               "type": "integer",
               "minimum": 0,
-              "description": "Phần doanh thu thuộc về admin (20%)."
+              "description": "Phần doanh thu thuộc về admin trước thuế (30%)."
+            },
+            "tax_system": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Thuế GTGT của phần doanh thu hệ thống (5%)."
+            },
+            "tax_admin": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Thuế GTGT của phần doanh thu admin (5%)."
+            },
+            "system_share_net": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Phần doanh thu thực lĩnh của hệ thống sau thuế."
+            },
+            "admin_share_net": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Phần doanh thu thực lĩnh của admin sau thuế."
             }
           },
           "required": [
             "_id",
             "date",
             "total_amount",
-            "system_share",
-            "admin_share"
+            "system_share_gross",
+            "admin_share_gross",
+            "tax_system",
+            "tax_admin",
+            "system_share_net",
+            "admin_share_net"
           ],
           "additionalProperties": false
         },
-        "jsonSample": [
-          {
-            "_id": "REVENUE20250214",
-            "date": "2025-02-14",
-            "total_amount": 500000,
-            "system_share": 400000,
-            "admin_share": 100000
-          },
-          {
-            "_id": "REVENUE20250215",
-            "date": "2025-02-15",
-            "total_amount": 300000,
-            "system_share": 240000,
-            "admin_share": 60000
-          },
-          {
-            "_id": "REVENUE20250216",
-            "date": "2025-02-16",
-            "total_amount": 700000,
-            "system_share": 560000,
-            "admin_share": 140000
-          }
-        ]
+        "jsonSample": []
       }
     },
     "private": {
@@ -6246,11 +6288,30 @@
             "pipeline": [
               {
                 "$match": {
-                  "transaction_type": "deposit",
+                  "transaction_type": "payment",
                   "status": "completed",
                   "created_at": {
-                    "$gte": "2025-02-14T00:00:00.000Z",
-                    "$lt": "2025-02-15T00:00:00.000Z"
+                    "$gte": {
+                      "$dateTrunc": {
+                        "date": "$$NOW",
+                        "unit": "day",
+                        "binSize": 1,
+                        "timezone": "Asia/Ho_Chi_Minh"
+                      }
+                    },
+                    "$lt": {
+                      "$add": [
+                        {
+                          "$dateTrunc": {
+                            "date": "$$NOW",
+                            "unit": "day",
+                            "binSize": 1,
+                            "timezone": "Asia/Ho_Chi_Minh"
+                          }
+                        },
+                        86400000
+                      ]
+                    }
                   }
                 }
               },
@@ -6262,18 +6323,29 @@
               },
               {
                 "$addFields": {
-                  "date": "2025-02-14",
-                  "system_share": { "$multiply": ["$total_amount", 0.8] },
-                  "admin_share": { "$multiply": ["$total_amount", 0.2] }
-                }
-              },
-              {
-                "$project": {
-                  "_id": 0,
-                  "date": 1,
-                  "total_amount": 1,
-                  "system_share": 1,
-                  "admin_share": 1
+                  "date": {
+                    "$dateToString": {
+                      "format": "%Y-%m-%d",
+                      "date": "$$NOW",
+                      "timezone": "Asia/Ho_Chi_Minh"
+                    }
+                  },
+                  "system_share_gross": { "$multiply": ["$total_amount", 0.7] },
+                  "admin_share_gross": { "$multiply": ["$total_amount", 0.3] },
+                  "tax_system": { "$multiply": ["$total_amount", 0.7, 0.05] },
+                  "tax_admin": { "$multiply": ["$total_amount", 0.3, 0.05] },
+                  "system_share_net": {
+                    "$subtract": [
+                      { "$multiply": ["$total_amount", 0.7] },
+                      { "$multiply": ["$total_amount", 0.7, 0.05] }
+                    ]
+                  },
+                  "admin_share_net": {
+                    "$subtract": [
+                      { "$multiply": ["$total_amount", 0.3] },
+                      { "$multiply": ["$total_amount", 0.3, 0.05] }
+                    ]
+                  }
                 }
               },
               {
@@ -6283,47 +6355,6 @@
                   "whenMatched": "merge",
                   "whenNotMatched": "insert"
                 }
-              }
-            ]
-          },
-          {
-            "pipeline": [
-              {
-                "$match": {
-                  "date": {
-                    "$gte": "2025-02-01",
-                    "$lte": "2025-02-28"
-                  }
-                }
-              },
-              {
-                "$group": {
-                  "_id": null,
-                  "total_amount": { "$sum": "$total_amount" },
-                  "system_share": { "$sum": "$system_share" },
-                  "admin_share": { "$sum": "$admin_share" }
-                }
-              },
-              {
-                "$project": {
-                  "_id": 0,
-                  "period": "February 2025",
-                  "total_amount": 1,
-                  "system_share": 1,
-                  "admin_share": 1
-                }
-              }
-            ]
-          },
-          {
-            "pipeline": [
-              {
-                "$match": {
-                  "date": "2025-02-14"
-                }
-              },
-              {
-                "$count": "records_found"
               }
             ]
           }
@@ -6568,8 +6599,17 @@
               },
               {
                 "$addFields": {
+                  "tax_amount": {
+                    "$multiply": ["$reward_amount", 0.1]
+                  },
+                  "net_reward": {
+                    "$multiply": ["$reward_amount", 0.9]
+                  },
                   "updated_balance": {
-                    "$add": ["$card_data.balance", "$reward_amount"]
+                    "$add": [
+                      "$card_data.balance",
+                      { "$multiply": ["$reward_amount", 0.9] }
+                    ]
                   }
                 }
               },
@@ -6577,7 +6617,32 @@
                 "$merge": {
                   "into": "collection_cards",
                   "on": "card_id",
-                  "whenMatched": "merge",
+                  "whenMatched": [
+                    {
+                      "$set": {
+                        "balance": "$updated_balance"
+                      }
+                    }
+                  ],
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": [
+                    {
+                      "$set": {
+                        "transaction_type": "reward",
+                        "amount": "$reward_amount",
+                        "tax_amount": "$tax_amount",
+                        "net_reward": "$net_reward",
+                        "status": "completed",
+                        "transaction_date": "$$NOW"
+                      }
+                    }
+                  ],
                   "whenNotMatched": "insert"
                 }
               },
