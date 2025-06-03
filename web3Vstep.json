@@ -80,14 +80,32 @@
           {
             "_id": "CARD001",
             "card_id": "C123456789",
-            "user_id": "USER123",
-            "public_key": "-BEGIN PUBLIC KEY-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...",
+            "user_id": "102fd0c3-ed5b-44f6-86da-896b250ddcc9",
+            "public_key": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
+            "token": "your-token-here",
             "qr_code": "https://example.com/cards/C123456789",
             "signature": "MEUCIQDZsVvXl9z2...c3RvbSBzaWduYXR1cmU=",
             "status": "active",
-            "device_id": "DEVICE123",
-            "created_at": "2025-02-14T18:26:02.588Z",
-            "hashed_studentID": "a1b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890"
+            "balance": 100000,
+            "device_id": null,
+            "created_at": "2025-01-01T12:00:00Z",
+            "user_OTP": null,
+            "hashed_studentID": "a1b2c3d4e5f6g7h8i9j0"
+          },
+          {
+            "_id": "CARD002",
+            "card_id": "C987654321",
+            "user_id": "203fd0c3-ed5b-44f6-86da-896b250ddcc9",
+            "public_key": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
+            "token": "your-token-here",
+            "qr_code": "https://example.com/cards/C987654321",
+            "signature": "MEUCIQDZsVvXl9z2...c3RvbSBzaWduYXR1cmU=",
+            "status": "active",
+            "balance": 50000,
+            "device_id": null,
+            "created_at": "2025-01-02T12:00:00Z",
+            "user_OTP": null,
+            "hashed_studentID": "a1b2c3d4e5f6g7h8i9j1"
           }
         ]
       }
@@ -331,7 +349,6 @@
           {
             "_id": "USER001",
             "user_id": "102fd0c3-ed5b-44f6-86da-896b250ddcc9",
-            "signature": "MEUCIQDZsVvXl9z2...c3RvbSBzaWduYXR1cmU=",
             "card_id": "C123456789"
           }
         ]
@@ -655,7 +672,44 @@
             }
           ],
           "additionalProperties": false
-        }
+        },
+        "jsonSample": [
+          {
+            "_id": "TEST001",
+            "admin_card_id": "AC-123456789",
+            "admin_id": "ADMIN-102fd0c3-ed5b-44f6-86da-896b250ddcc9",
+            "admin_signature": "MEUCIQDZsVvXl9z2...c3RvbSBzaWduYXR1cmU=",
+            "test_id": "LISTEN001",
+            "test_type": "listening",
+            "level": "B1",
+            "audio_url": "https://example.com/audio/test1.mp3",
+            "questions": [
+              {
+                "question_id": "L001",
+                "question_text": "What is the main idea of the audio?",
+                "options": ["A", "B", "C", "D"],
+                "correct_answer": "A"
+              },
+              {
+                "question_id": "L002",
+                "question_text": "What did the speaker say about the topic?",
+                "options": ["A", "B", "C", "D"],
+                "correct_answer": "C"
+              }
+            ]
+          },
+          {
+            "_id": "TEST002",
+            "admin_card_id": null,
+            "admin_id": null,
+            "admin_signature": null,
+            "test_id": null,
+            "test_type": null,
+            "level": null,
+            "audio_url": null,
+            "questions": []
+          }
+        ]
       }
     },
     "private": {
@@ -1007,66 +1061,55 @@
         },
         "jsonSample": [
           {
-            "_id": "TEST001",
-            "user_id": "USER123",
+            "_id": "USER_TEST001",
+            "user_id": "102fd0c3-ed5b-44f6-86da-896b250ddcc9",
             "test_id": "LISTEN001",
             "test_type": "listening",
-            "submission_time": "2025-02-15T10:00:00.000Z",
+            "submission_time": "2025-01-01T12:00:00Z",
             "user_answers": {
               "listening": [
                 {
                   "question_id": "L001",
                   "user_answer": "A",
                   "is_correct": true,
-                  "correct_answer": "A"
-                },
-                {
-                  "question_id": "L002",
-                  "user_answer": "B",
-                  "is_correct": false,
-                  "correct_answer": "C"
+                  "correct_answer": "A",
+                  "audio_url": "https://example.com/audio/question1.mp3"
                 }
               ],
               "reading": []
             },
-            "token": "abc123xyz",
-            "total_score": 50,
-            "avg_score": 50,
-            "new_level": "B1",
-            "is_eligible_for_mentorship": false,
+            "token": "abc123xyz456",
+            "total_score": 85,
+            "avg_score": 85,
+            "new_level": "B2",
+            "is_eligible_for_mentorship": true,
             "is_completed": true,
-            "post_test_actions": ["practice"]
+            "post_test_actions": ["practice", "upload_test"]
           },
           {
-            "_id": "TEST002",
-            "user_id": "USER123",
+            "_id": "USER_TEST002",
+            "user_id": "102fd0c3-ed5b-44f6-86da-896b250ddcc9",
             "test_id": "READ001",
             "test_type": "reading",
-            "submission_time": "2025-02-15T11:00:00.000Z",
+            "submission_time": "2025-01-02T12:00:00Z",
             "user_answers": {
               "listening": [],
               "reading": [
                 {
                   "question_id": "R001",
-                  "user_answer": "True",
-                  "is_correct": true,
-                  "correct_answer": "True"
-                },
-                {
-                  "question_id": "R002",
-                  "user_answer": "False",
-                  "is_correct": true,
-                  "correct_answer": "False"
+                  "user_answer": "B",
+                  "is_correct": false,
+                  "correct_answer": "C"
                 }
               ]
             },
-            "token": "def456uvw",
-            "total_score": 80,
-            "avg_score": 80,
-            "new_level": "B2",
-            "is_eligible_for_mentorship": true,
+            "token": "def789uvw012",
+            "total_score": 70,
+            "avg_score": 70,
+            "new_level": "B1",
+            "is_eligible_for_mentorship": false,
             "is_completed": true,
-            "post_test_actions": ["upload_test"]
+            "post_test_actions": ["practice"]
           }
         ]
       }
@@ -2840,6 +2883,7 @@
       }
     }
   },
+
   {
     "_id": "collection_user_practice_results",
     "public": {
@@ -5010,283 +5054,318 @@
     }
   },
 
-  {
-    "_id": "matching_elite_learner",
-    "public": {
-      "node_data": {
-        "jsonSchema": {
-          "title": "MatchingLogData",
-          "type": "object",
-          "properties": {
-            "_id": { "type": "string" },
-            "elite_id": {
-              "type": "string",
-              "description": "ID của Elite Partner."
-            },
-            "learner_id": {
-              "type": "string",
-              "description": "ID của Learner."
-            },
-            "matched_at": {
-              "type": "string",
-              "format": "date-time",
-              "description": "Thời điểm ghép cặp."
-            },
-            "end_at": {
-              "type": "string",
-              "format": "date-time",
-              "description": "Thời điểm kết thúc mối quan hệ matching."
-            },
-            "status": {
-              "type": "string",
-              "enum": ["pending", "active", "terminated"],
-              "description": "Trạng thái của mối quan hệ matching."
-            },
-            "log": {
-              "type": "object",
-              "properties": {
-                "elite_rank": {
-                  "type": "integer",
-                  "description": "Thứ hạng của Elite Partner."
-                },
-                "learner_rank": {
-                  "type": "integer",
-                  "description": "Thứ hạng của Learner."
-                }
-              }
-            },
-            "wants_matching": {
-              "type": "boolean",
-              "description": "Learner có muốn tìm kiếm sự hỗ trợ từ Elite hay không."
-            },
-            "signature": {
-              "type": "string",
-              "description": "Chữ ký số của Learner nếu họ đồng ý matching."
-            }
-          },
-          "required": [
-            "_id",
-            "elite_id",
-            "learner_id",
-            "matched_at",
-            "end_at",
-            "status",
-            "log",
-            "wants_matching"
-          ],
-          "additionalProperties": false
-        }
-      }
-    },
-    "private": {
-      "node_function": {
-        "edge": [
-          {
-            "pipeline": [
-              {
-                "$match": {
-                  "status": "pending",
-                  "wants_matching": true
-                }
+  [
+    {
+      "_id": "matching_elite_learner",
+      "public": {
+        "node_data": {
+          "jsonSchema": {
+            "title": "MatchingLogData",
+            "type": "object",
+            "properties": {
+              "_id": { "type": "string" },
+              "elite_id": {
+                "type": "string",
+                "description": "ID của Elite Partner."
               },
-              {
-                "$lookup": {
-                  "from": "collection_cards",
-                  "localField": "learner_id",
-                  "foreignField": "user_id",
-                  "as": "card_data"
-                }
+              "learner_id": {
+                "type": "string",
+                "description": "ID của Learner."
               },
-              {
-                "$unwind": "$card_data"
+              "matched_at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Thời điểm ghép cặp."
               },
-              {
-                "$addFields": {
-                  "signature": "$card_data.signature",
-                  "is_signature_valid": true
-                }
+              "end_at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Thời điểm kết thúc mối quan hệ matching."
               },
-              {
-                "$merge": {
-                  "into": "matching_logs",
-                  "on": "_id",
-                  "whenMatched": "merge",
-                  "whenNotMatched": "insert"
-                }
-              }
-            ],
-            "purpose": "Pipeline xử lý matching dựa trên lựa chọn của Learner.",
-            "data_input_from_node": [
-              "matching_elite_learner",
-              "collection_cards"
-            ],
-            "data_output_to_node": "matching_logs"
-          },
-          {
-            "pipeline": [
-              {
-                "$match": {
-                  "is_elite_partner": true,
-                  "status": "active"
-                }
+              "status": {
+                "type": "string",
+                "enum": ["pending", "active", "terminated"],
+                "description": "Trạng thái của mối quan hệ matching."
               },
-
-              {
-                "$lookup": {
-                  "from": "collection_leaderboard",
-                  "localField": "user_id",
-                  "foreignField": "user_id",
-                  "as": "leaderboard_data"
-                }
-              },
-              {
-                "$unwind": "$leaderboard_data"
-              },
-              {
-                "$addFields": {
-                  "elite_rank": "$leaderboard_data.rank"
-                }
-              },
-
-              {
-                "$lookup": {
-                  "from": "collection_leaderboard",
-                  "let": { "current_user_id": "$user_id" },
-                  "pipeline": [
-                    {
-                      "$match": {
-                        "$expr": {
-                          "$and": [
-                            { "$ne": ["$user_id", "$$current_user_id"] },
-                            {
-                              "$or": [
-                                { "$gt": ["$rank", 20] },
-                                { "$eq": ["$rank", null] }
-                              ]
-                            }
-                          ]
-                        }
-                      }
-                    }
-                  ],
-                  "as": "eligible_learners"
-                }
-              },
-              {
-                "$unwind": "$eligible_learners"
-              },
-
-              {
-                "$lookup": {
-                  "from": "matching_logs",
-                  "localField": "user_id",
-                  "foreignField": "elite_id",
-                  "as": "existing_matches"
-                }
-              },
-              {
-                "$addFields": {
-                  "current_match_count": { "$size": "$existing_matches" }
-                }
-              },
-              {
-                "$match": {
-                  "current_match_count": { "$lt": 3 }
-                }
-              },
-
-              {
-                "$lookup": {
-                  "from": "matching_logs",
-                  "localField": "eligible_learners.user_id",
-                  "foreignField": "learner_id",
-                  "as": "learner_existing_matches"
-                }
-              },
-              {
-                "$addFields": {
-                  "learner_existing_match_count": {
-                    "$size": "$learner_existing_matches"
+              "log": {
+                "type": "object",
+                "properties": {
+                  "elite_rank": {
+                    "type": "integer",
+                    "description": "Thứ hạng của Elite Partner."
+                  },
+                  "learner_rank": {
+                    "type": "integer",
+                    "description": "Thứ hạng của Learner."
                   }
                 }
               },
-              {
-                "$match": {
-                  "learner_existing_match_count": 0
-                }
+              "wants_matching": {
+                "type": "boolean",
+                "description": "Learner có muốn tìm kiếm sự hỗ trợ từ Elite hay không."
               },
-
-              {
-                "$addFields": {
-                  "learner_id": "$eligible_learners.user_id",
-                  "learner_rank": "$eligible_learners.rank",
-                  "matched_at": "$$NOW",
-                  "end_at": {
-                    "$dateAdd": {
-                      "startDate": "$$NOW",
-                      "unit": "week",
-                      "amount": 1
-                    }
-                  },
-                  "status": "pending",
-                  "wants_matching": true
-                }
-              },
-
-              {
-                "$project": {
-                  "_id": {
-                    "$concat": [
-                      "$user_id",
-                      "_",
-                      "$eligible_learners.user_id",
-                      "_",
-                      { "$toString": "$$NOW" }
-                    ]
-                  },
-                  "elite_id": "$user_id",
-                  "learner_id": 1,
-                  "matched_at": 1,
-                  "end_at": 1,
-                  "status": 1,
-                  "log": {
-                    "elite_rank": "$elite_rank",
-                    "learner_rank": "$learner_rank"
-                  },
-                  "wants_matching": 1,
-                  "signature": "$eligible_learners.user_id"
-                }
-              },
-
-              {
-                "$merge": {
-                  "into": "matching_logs",
-                  "on": "_id",
-                  "whenMatched": "merge",
-                  "whenNotMatched": "insert"
-                }
+              "signature": {
+                "type": "string",
+                "description": "Chữ ký số của Learner nếu họ đồng ý matching."
               }
+            },
+            "required": [
+              "_id",
+              "elite_id",
+              "learner_id",
+              "matched_at",
+              "end_at",
+              "status",
+              "log",
+              "wants_matching"
             ],
-            "purpose": "Pipeline for automatically matching Elite Partners with Learners based on rank and status.",
-            "data_input_from_node": [
-              "elite_partners",
-              "leaderboard",
-              "matching_logs"
-            ],
-            "data_output_to_node": "matching_logs"
-          }
-        ]
-      }
-    },
-    "personal": {
-      "node_info": {
-        "name": "English Test System",
-        "author": "Joshept",
-        "version": "1.0",
-        "year": "2025"
+            "additionalProperties": false
+          },
+          "jsonSample": [
+            {
+              "_id": "12345_67890_2025-01-01T00:00:00Z",
+              "elite_id": "12345",
+              "learner_id": "67890",
+              "matched_at": "2025-01-01T00:00:00Z",
+              "end_at": "2025-01-08T00:00:00Z",
+              "status": "pending",
+              "log": {
+                "elite_rank": 1,
+                "learner_rank": 10
+              },
+              "wants_matching": true,
+              "signature": "signature_of_learner"
+            },
+            {
+              "_id": "54321_09876_2025-01-02T00:00:00Z",
+              "elite_id": "54321",
+              "learner_id": "09876",
+              "matched_at": "2025-01-02T00:00:00Z",
+              "end_at": "2025-01-09T00:00:00Z",
+              "status": "active",
+              "log": {
+                "elite_rank": 2,
+                "learner_rank": 20
+              },
+              "wants_matching": true,
+              "signature": "signature_of_learner"
+            }
+          ]
+        }
+      },
+      "private": {
+        "node_function": {
+          "edge": [
+            {
+              "pipeline": [
+                {
+                  "$match": {
+                    "status": "pending",
+                    "wants_matching": true
+                  }
+                },
+                {
+                  "$lookup": {
+                    "from": "collection_cards",
+                    "localField": "learner_id",
+                    "foreignField": "user_id",
+                    "as": "card_data"
+                  }
+                },
+                {
+                  "$unwind": "$card_data"
+                },
+                {
+                  "$addFields": {
+                    "signature": "$card_data.signature",
+                    "is_signature_valid": true
+                  }
+                },
+                {
+                  "$merge": {
+                    "into": "matching_logs",
+                    "on": "_id",
+                    "whenMatched": "merge",
+                    "whenNotMatched": "insert"
+                  }
+                }
+              ],
+              "purpose": "Pipeline xử lý matching dựa trên lựa chọn của Learner.",
+              "data_input_from_node": [
+                "matching_elite_learner",
+                "collection_cards"
+              ],
+              "data_output_to_node": "matching_logs"
+            },
+            {
+              "pipeline": [
+                {
+                  "$match": {
+                    "is_elite_partner": true,
+                    "status": "active"
+                  }
+                },
+
+                {
+                  "$lookup": {
+                    "from": "collection_leaderboard",
+                    "localField": "user_id",
+                    "foreignField": "user_id",
+                    "as": "leaderboard_data"
+                  }
+                },
+                {
+                  "$unwind": "$leaderboard_data"
+                },
+                {
+                  "$addFields": {
+                    "elite_rank": "$leaderboard_data.rank"
+                  }
+                },
+
+                {
+                  "$lookup": {
+                    "from": "collection_leaderboard",
+                    "let": { "current_user_id": "$user_id" },
+                    "pipeline": [
+                      {
+                        "$match": {
+                          "$expr": {
+                            "$and": [
+                              { "$ne": ["$user_id", "$$current_user_id"] },
+                              {
+                                "$or": [
+                                  { "$gt": ["$rank", 20] },
+                                  { "$eq": ["$rank", null] }
+                                ]
+                              },
+                              { "$eq": ["$wants_matching", true] }
+                            ]
+                          }
+                        }
+                      }
+                    ],
+                    "as": "eligible_learners"
+                  }
+                },
+                {
+                  "$unwind": "$eligible_learners"
+                },
+
+                {
+                  "$lookup": {
+                    "from": "matching_logs",
+                    "localField": "user_id",
+                    "foreignField": "elite_id",
+                    "as": "existing_matches"
+                  }
+                },
+                {
+                  "$addFields": {
+                    "current_match_count": { "$size": "$existing_matches" }
+                  }
+                },
+                {
+                  "$match": {
+                    "current_match_count": { "$lt": 3 }
+                  }
+                },
+
+                {
+                  "$lookup": {
+                    "from": "matching_logs",
+                    "localField": "eligible_learners.user_id",
+                    "foreignField": "learner_id",
+                    "as": "learner_existing_matches"
+                  }
+                },
+                {
+                  "$addFields": {
+                    "learner_existing_match_count": {
+                      "$size": "$learner_existing_matches"
+                    }
+                  }
+                },
+                {
+                  "$match": {
+                    "learner_existing_match_count": 0
+                  }
+                },
+
+                {
+                  "$addFields": {
+                    "learner_id": "$eligible_learners.user_id",
+                    "learner_rank": "$eligible_learners.rank",
+                    "matched_at": "$$NOW",
+                    "end_at": {
+                      "$dateAdd": {
+                        "startDate": "$$NOW",
+                        "unit": "week",
+                        "amount": 1
+                      }
+                    },
+                    "status": "pending",
+                    "wants_matching": true
+                  }
+                },
+
+                {
+                  "$project": {
+                    "_id": {
+                      "$concat": [
+                        "$user_id",
+                        "_",
+                        "$eligible_learners.user_id",
+                        "_",
+                        { "$toString": "$$NOW" }
+                      ]
+                    },
+                    "elite_id": "$user_id",
+                    "learner_id": 1,
+                    "matched_at": 1,
+                    "end_at": 1,
+                    "status": 1,
+                    "log": {
+                      "elite_rank": "$elite_rank",
+                      "learner_rank": "$learner_rank"
+                    },
+                    "wants_matching": 1,
+                    "signature": "$eligible_learners.user_id"
+                  }
+                },
+
+                {
+                  "$merge": {
+                    "into": "matching_logs",
+                    "on": "_id",
+                    "whenMatched": "merge",
+                    "whenNotMatched": "insert"
+                  }
+                }
+              ],
+              "purpose": "Pipeline for automatically matching Elite Partners with Learners based on rank and status.",
+              "data_input_from_node": [
+                "elite_partners",
+                "leaderboard",
+                "matching_logs"
+              ],
+              "data_output_to_node": "matching_logs"
+            }
+          ]
+        }
+      },
+      "personal": {
+        "node_info": {
+          "name": "English Test System",
+          "author": "Joshept",
+          "version": "1.0",
+          "year": "2025"
+        }
       }
     }
-  },
+  ]
+  ,
+
   {
     "_id": "supporting_feedback",
     "public": {
@@ -5543,6 +5622,7 @@
       }
     }
   },
+
   {
     "_id": "collection_recharge_codes",
     "public": {
@@ -5841,7 +5921,7 @@
             },
             "status": {
               "type": "string",
-              "enum": ["pending", "completed", "failed"],
+              "enum": ["pending", "completed", "failed", "refunded"],
               "description": "Trạng thái của giao dịch."
             }
           },
@@ -5858,30 +5938,28 @@
         },
         "jsonSample": [
           {
-            "_id": "txn_1234567890",
-            "user_id": "user_abc123",
+            "_id": "txn_001",
+            "user_id": "user_123",
             "transaction_type": "deposit",
-            "amount": 10000,
-            "description": "Nạp tiền qua mã QR thẻ vật lý",
-            "created_at": "2025-06-01T10:15:00Z",
-            "card_id": "card_9876543210",
-            "signature": "MEUCIQDf5x9RbK5G0nQ5G4ZkM3ztzvVv...TớiCuốiChữKý==",
-            "public_key": "04c5ab3d17b67f938c0f467feef9a2f1be...KhóaDàiTớiCuối",
-            "status": "completed",
-            "steps": [
-              {
-                "step_id": "step1",
-                "attempts_added": 1,
-                "status": "completed",
-                "verified_at": "2025-06-01T10:16:00Z"
-              },
-              {
-                "step_id": "step2",
-                "attempts_added": 2,
-                "status": "completed",
-                "verified_at": "2025-06-01T10:17:30Z"
-              }
-            ]
+            "amount": 100000,
+            "description": "Nạp tiền vào ví.",
+            "created_at": "2025-02-14T18:26:02.588Z",
+            "card_id": "card_456",
+            "signature": "signature_789",
+            "public_key": "public_key_abc",
+            "status": "completed"
+          },
+          {
+            "_id": "txn_002",
+            "user_id": "user_456",
+            "transaction_type": "payment",
+            "amount": 50000,
+            "description": "Thanh toán phí dịch vụ.",
+            "created_at": "2025-02-14T18:27:15.345Z",
+            "card_id": "card_789",
+            "signature": "signature_def",
+            "public_key": "public_key_xyz",
+            "status": "pending"
           }
         ]
       }
@@ -6174,29 +6252,50 @@
 
               {
                 "$lookup": {
-                  "from": "collection_practice_materials",
-                  "localField": "material_id",
-                  "foreignField": "material_id",
-                  "as": "material_data"
+                  "from": "collection_cards",
+                  "localField": "card_id",
+                  "foreignField": "_id",
+                  "as": "card_data"
                 }
               },
               {
-                "$addFields": {
-                  "is_locked": true
+                "$unwind": "$card_data"
+              },
+              {
+                "$set": {
+                  "card_data.balance": {
+                    "$add": ["$card_data.balance", "$amount"]
+                  }
                 }
               },
               {
                 "$merge": {
-                  "into": "collection_practice_materials",
+                  "into": "collection_cards",
                   "on": "_id",
                   "whenMatched": "merge",
-                  "whenNotMatched": "insert"
+                  "whenNotMatched": "fail"
+                }
+              },
+              {
+                "$set": {
+                  "status": "refunded"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "fail"
                 }
               }
             ],
-            "purpose": "Khóa quyền truy cập vào collection_practice_materials nếu giao dịch thất bại.",
-            "data_input_from_node": ["collection_practice_materials"],
-            "data_output_to_node": ["collection_practice_materials"]
+            "purpose": "Hoàn tiền cho người dùng nếu giao dịch thanh toán thất bại.",
+            "data_input_from_node": ["collection_user_transactions"],
+            "data_output_to_node": [
+              "collection_cards",
+              "collection_user_transactions"
+            ]
           }
         ]
       }
@@ -6278,7 +6377,30 @@
           ],
           "additionalProperties": false
         },
-        "jsonSample": []
+        "jsonSample": [
+          {
+            "_id": "revenue_2025_02_14",
+            "date": "2025-02-14",
+            "total_amount": 1000000,
+            "system_share_gross": 700000,
+            "admin_share_gross": 300000,
+            "tax_system": 35000,
+            "tax_admin": 15000,
+            "system_share_net": 665000,
+            "admin_share_net": 285000
+          },
+          {
+            "_id": "revenue_2025_02_15",
+            "date": "2025-02-15",
+            "total_amount": 1200000,
+            "system_share_gross": 840000,
+            "admin_share_gross": 360000,
+            "tax_system": 42000,
+            "tax_admin": 18000,
+            "system_share_net": 798000,
+            "admin_share_net": 342000
+          }
+        ]
       }
     },
     "private": {
@@ -6432,24 +6554,24 @@
         },
         "jsonSample": [
           {
-            "_id": "REWARD_001",
-            "elite_id": "ELITE_001",
-            "partner_id": "USER_LB_002",
-            "reward_amount": 65000,
+            "_id": "reward_001",
+            "elite_id": "elite_123",
+            "partner_id": "partner_456",
+            "reward_amount": 150000,
             "reward_percentage": 0.3,
             "rank_improvement": 15,
             "reward_date": "2025-02-14T18:26:02.588Z",
-            "description": "Thưởng vì giúp partner thăng hạng 15 bậc trong leaderboard."
+            "description": "Thưởng cho Partner vì đã cải thiện hạng trong leaderboard."
           },
           {
-            "_id": "REWARD_002",
-            "elite_id": "ELITE_002",
-            "partner_id": "USER_LB_003",
-            "reward_amount": 55000,
+            "_id": "reward_002",
+            "elite_id": "elite_789",
+            "partner_id": "partner_012",
+            "reward_amount": 100000,
             "reward_percentage": 0.2,
             "rank_improvement": 10,
-            "reward_date": "2025-02-14T19:00:00.000Z",
-            "description": "Thưởng vì giúp partner thăng hạng 10 bậc trong leaderboard."
+            "reward_date": "2025-02-14T18:27:15.345Z",
+            "description": "Thưởng cho Partner vì đã cải thiện hạng trong leaderboard."
           }
         ]
       }
