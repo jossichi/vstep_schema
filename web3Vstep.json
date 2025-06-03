@@ -58,6 +58,12 @@
               "pattern": "^[0-9]{6}$",
               "description": "Mã OTP do người dùng nhập, phải là số có 6 chữ số."
             },
+            "remaining_attempts": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 2,
+              "description": "Số lượt làm bài còn lại của người dùng."
+            },
             "hashed_studentID": {
               "type": "string",
               "unique": true,
@@ -73,39 +79,26 @@
             "token",
             "status",
             "created_at",
-            "hashed_studentID"
+            "hashed_studentID",
+            "remaining_attempts"
           ]
         },
         "jsonSample": [
           {
-            "_id": "CARD001",
-            "card_id": "C123456789",
-            "user_id": "102fd0c3-ed5b-44f6-86da-896b250ddcc9",
+            "_id": "60c72b2f9b1e8c001c8e4d3a",
+            "card_id": "card123",
+            "user_id": "user123",
             "public_key": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
-            "token": "your-token-here",
-            "qr_code": "https://example.com/cards/C123456789",
-            "signature": "MEUCIQDZsVvXl9z2...c3RvbSBzaWduYXR1cmU=",
+            "token": "token123",
+            "qr_code": "https://example.com/cards/card123",
+            "signature": "signature123",
             "status": "active",
-            "balance": 100000,
+            "balance": 10000,
             "device_id": null,
-            "created_at": "2025-01-01T12:00:00Z",
+            "created_at": "2025-01-01T10:00:00Z",
             "user_OTP": null,
-            "hashed_studentID": "a1b2c3d4e5f6g7h8i9j0"
-          },
-          {
-            "_id": "CARD002",
-            "card_id": "C987654321",
-            "user_id": "203fd0c3-ed5b-44f6-86da-896b250ddcc9",
-            "public_key": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
-            "token": "your-token-here",
-            "qr_code": "https://example.com/cards/C987654321",
-            "signature": "MEUCIQDZsVvXl9z2...c3RvbSBzaWduYXR1cmU=",
-            "status": "active",
-            "balance": 50000,
-            "device_id": null,
-            "created_at": "2025-01-02T12:00:00Z",
-            "user_OTP": null,
-            "hashed_studentID": "a1b2c3d4e5f6g7h8i9j1"
+            "remaining_attempts": 2,
+            "hashed_studentID": "hashedStudentID123"
           }
         ]
       }
@@ -289,6 +282,207 @@
             "purpose": "Xác thực giao dịch thanh toán bằng OTP và lưu vào collection_user_transactions.",
             "data_input_from_node": [],
             "data_output_to_node": []
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "remaining_attempts": 0,
+                  "is_completed": false
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_user_transactions",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_transactions"
+                }
+              },
+              {
+                "$addFields": {
+                  "has_pending_transaction": {
+                    "$anyElementTrue": {
+                      "$map": {
+                        "input": "$user_transactions",
+                        "as": "transaction",
+                        "in": {
+                          "$and": [
+                            { "$eq": ["$$transaction.status", "pending"] },
+                            {
+                              "$eq": [
+                                "$$transaction.transaction_type",
+                                "payment"
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "has_pending_transaction": false
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Tạo giao dịch thanh toán mới khi remaining_attempts == 0.",
+            "data_input_from_node": ["collection_cards"],
+            "data_output_to_node": ["collection_user_transactions"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "transaction_type": "payment",
+                  "amount": 10000,
+                  "status": "completed"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_materials"
+                }
+              },
+              {
+                "$unwind": "$user_materials"
+              },
+              {
+                "$addFields": {
+                  "user_materials.remaining_attempts": {
+                    "$add": ["$user_materials.remaining_attempts", 5]
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_cards",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Mở khóa thêm lượt làm bài sau khi người dùng thanh toán 10k.",
+            "data_input_from_node": ["collection_user_transactions"],
+            "data_output_to_node": ["collection_cards"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "last_reset_time": { "$exists": true },
+                  "$expr": {
+                    "$lt": [
+                      "$last_reset_time",
+                      {
+                        "$add": [
+                          {
+                            "$dateTrunc": {
+                              "date": "$$NOW",
+                              "unit": "day",
+                              "binSize": 1,
+                              "timezone": "Asia/Ho_Chi_Minh"
+                            }
+                          },
+                          { "$literal": 25200000 }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_materials"
+                }
+              },
+              {
+                "$unwind": "$user_materials"
+              },
+              {
+                "$addFields": {
+                  "refund_amount": {
+                    "$multiply": [
+                      {
+                        "$subtract": [5, "$user_materials.remaining_attempts"]
+                      },
+                      2000
+                    ]
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "refund_amount": { "$gt": 0 }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_cards",
+                  "on": "user_id",
+                  "whenMatched": [
+                    {
+                      "$set": {
+                        "balance": { "$add": ["$balance", "$refund_amount"] }
+                      }
+                    }
+                  ],
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": [
+                    {
+                      "$set": {
+                        "refund_amount": "$refund_amount",
+                        "refund_time": "$$NOW",
+                        "status": "refunded"
+                      }
+                    }
+                  ],
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$set": {
+                  "user_materials.remaining_attempts": 0,
+                  "last_reset_time": { "$now": [] }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_materials_user_done",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Reset số lượng bài tập và lượt làm bài còn lại vào lúc 7:00 AM hằng ngày.",
+            "data_input_from_node": ["collection_materials_user_done"],
+            "data_output_to_node": ["collection_materials_user_done"]
           }
         ]
       }
@@ -2336,72 +2530,109 @@
         },
         "jsonSample": [
           {
-            "_id": "USER123_MATERIAL_DONE",
-            "user_id": "USER123",
-            "material_id": "MATERIAL123",
+            "_id": "60c72b2f9b1e8c001c8e4d3a",
+            "user_id": "user123",
+            "material_id": "material456",
             "section": "listening",
             "part": 1,
-            "submission_time": "2025-02-14T18:26:02.588Z",
+            "submission_time": "2025-01-01T10:00:00Z",
             "data": {
               "listening": [
                 {
-                  "question_id": "L1",
-                  "question_text": "What is the main topic of the conversation?",
-                  "options": [
-                    "The importance of saving money.",
-                    "How to invest in stocks.",
-                    "Tips for planning a vacation.",
-                    "Strategies for starting a business."
-                  ],
-                  "correct_answer": "The importance of saving money.",
-                  "user_answer": "The importance of saving money."
-                },
-                {
-                  "question_id": "L2",
-                  "question_text": "Why does the man want to save money?",
-                  "options": [
-                    "To buy a house.",
-                    "To travel abroad.",
-                    "To start a business.",
-                    "To pay off debts."
-                  ],
-                  "correct_answer": "To buy a house.",
-                  "user_answer": "To travel abroad."
-                },
-                {
-                  "_id": "USER123_MATERIAL_DONE",
-                  "user_id": "USER123",
-                  "material_id": "MATERIAL123",
-                  "section": "listening",
-                  "part": 1,
-                  "submission_time": "2025-02-14T18:26:02.588Z",
-                  "data": {
-                    "listening": [
-                      {
-                        "question_id": "L1",
-                        "question_text": "What is the main topic of the conversation?",
-                        "options": [
-                          "The importance of saving money.",
-                          "How to invest in stocks.",
-                          "Tips for planning a vacation.",
-                          "Strategies for starting a business."
-                        ],
-                        "correct_answer": "The importance of saving money.",
-                        "user_answer": "The importance of saving money."
-                      }
-                    ]
-                  },
-                  "is_completed": true,
-                  "material_count": 2,
-                  "remaining_attempts": 5,
-                  "last_reset_time": "2025-02-14T07:00:00.000Z"
+                  "question_id": "Q1",
+                  "user_answer": "A",
+                  "correct_answer": "A"
                 }
-              ]
+              ],
+              "reading": [],
+              "writing": {
+                "prompt": "Write about your favorite book.",
+                "user_answer": "My favorite book is..."
+              },
+              "speaking": {
+                "prompt": "Describe your daily routine.",
+                "user_audio": "/9j/4AAQSkZJRgABAQEASABIAAD/..."
+              }
             },
-            "is_completed": true,
-            "material_count": 1,
+            "material_count": 3,
+            "remaining_attempts": 2,
+            "last_reset_time": null,
+            "is_completed": false
+          },
+          {
+            "_id": "60c72b2f9b1e8c001c8e4d3b",
+            "user_id": "user456",
+            "material_id": "material789",
+            "section": "reading",
+            "part": 2,
+            "submission_time": "2025-01-01T11:00:00Z",
+            "data": {
+              "listening": [],
+              "reading": [
+                {
+                  "question_id": "Q2",
+                  "user_answer": "B",
+                  "correct_answer": "C"
+                }
+              ],
+              "writing": {
+                "prompt": "Describe your favorite place.",
+                "user_answer": "My favorite place is..."
+              },
+              "speaking": {
+                "prompt": "Talk about your hobbies.",
+                "user_audio": "/9j/4AAQSkZJRgABAQEASABIAAD/..."
+              }
+            },
+            "material_count": 5,
             "remaining_attempts": 1,
-            "last_reset_time": "2025-02-14T07:00:00.000Z"
+            "last_reset_time": null,
+            "is_completed": true
+          },
+          {
+            "_id": "60c72b2f9b1e8c001c8e4d3c",
+            "user_id": "user789",
+            "material_id": "material012",
+            "section": "writing",
+            "part": 3,
+            "submission_time": "2025-01-01T12:00:00Z",
+            "data": {
+              "listening": [],
+              "reading": [],
+              "writing": {
+                "prompt": "Write about your travel experience.",
+                "user_answer": "I traveled to..."
+              },
+              "speaking": {
+                "prompt": "Explain a complex topic.",
+                "user_audio": "/9j/4AAQSkZJRgABAQEASABIAAD/..."
+              }
+            },
+            "material_count": 2,
+            "remaining_attempts": 0,
+            "last_reset_time": null,
+            "is_completed": false
+          },
+          {
+            "_id": "60c72b2f9b1e8c001c8e4d3d",
+            "user_id": "user012",
+            "material_id": "material345",
+            "section": "speaking",
+            "part": 4,
+            "submission_time": "2025-01-01T13:00:00Z",
+            "data": {
+              "listening": [],
+              "reading": [],
+              "writing": {},
+              "speaking": {
+                "prompt": "Discuss a current event.",
+                "user_audio": "/9j/4AAQSkZJRgABAQEASABIAAD/..."
+              }
+            },
+            "material_count": 1,
+            "remaining_attempts": 5,
+            "last_reset_time": null,
+            "is_completed": false
           }
         ]
       }
@@ -2438,6 +2669,80 @@
             "data_input_from_node": ["collection_user_login"],
 
             "data_output_to_node": ["collection_materials_user_done"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$addFields": {
+                  "has_remaining_attempts": {
+                    "$cond": {
+                      "if": { "$gt": ["$card_data.remaining_attempts", 0] },
+                      "then": true,
+                      "else": false
+                    }
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "has_remaining_attempts": true
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_materials_user_done",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$facet": {
+                  "allowed_users": [
+                    {
+                      "$match": {
+                        "has_remaining_attempts": true
+                      }
+                    }
+                  ],
+                  "payment_required_users": [
+                    {
+                      "$match": {
+                        "has_remaining_attempts": false
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "$project": {
+                  "allowed_users": 1,
+                  "payment_required_users": 1
+                }
+              }
+            ],
+            "purpose": "Kiểm tra người dùng có thẻ và có lượt làm bài hay không, nếu không thì yêu cầu thanh toán.",
+            "data_input_from_node": ["collection_cards"],
+            "data_output_to_node": [
+              "collection_materials_user_done",
+              " collection_user_transactions"
+            ]
           },
           {
             "pipeline": [
@@ -2602,6 +2907,17 @@
                 }
               },
               {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
                 "$addFields": {
                   "is_completed": true,
                   "remaining_attempts": {
@@ -2612,75 +2928,18 @@
               },
               {
                 "$merge": {
-                  "into": "collection_materials_user_done",
+                  "into": "collection_cards",
                   "on": "_id",
                   "whenMatched": "merge",
                   "whenNotMatched": "insert"
                 }
               }
             ],
-            "purpose": "Cập nhật is_completed và giảm remaining_attempts khi data đầy đủ.",
+            "purpose": "Cập nhật trạng thái hoàn thành phần thi và giảm số lượt làm bài còn lại.",
             "data_input_from_node": ["collection_materials_user_done"],
-            "data_output_to_node": ["collection_materials_user_done"]
+            "data_output_to_node": ["collection_cards"]
           },
-          {
-            "pipeline": [
-              {
-                "$match": {
-                  "user_id": { "$exists": true },
-                  "remaining_attempts": 0,
-                  "is_completed": false
-                }
-              },
-              {
-                "$lookup": {
-                  "from": "collection_user_transactions",
-                  "localField": "user_id",
-                  "foreignField": "user_id",
-                  "as": "user_transactions"
-                }
-              },
-              {
-                "$addFields": {
-                  "has_pending_transaction": {
-                    "$anyElementTrue": {
-                      "$map": {
-                        "input": "$user_transactions",
-                        "as": "transaction",
-                        "in": {
-                          "$and": [
-                            { "$eq": ["$$transaction.status", "pending"] },
-                            {
-                              "$eq": [
-                                "$$transaction.transaction_type",
-                                "payment"
-                              ]
-                            }
-                          ]
-                        }
-                      }
-                    }
-                  }
-                }
-              },
-              {
-                "$match": {
-                  "has_pending_transaction": false
-                }
-              },
-              {
-                "$merge": {
-                  "into": "collection_user_transactions",
-                  "on": "_id",
-                  "whenMatched": "merge",
-                  "whenNotMatched": "insert"
-                }
-              }
-            ],
-            "purpose": "Tạo giao dịch thanh toán mới khi remaining_attempts == 0.",
-            "data_input_from_node": ["collection_materials_user_done"],
-            "data_output_to_node": ["collection_user_transactions"]
-          },
+
           {
             "pipeline": [
               {
@@ -2717,7 +2976,7 @@
               },
               {
                 "$merge": {
-                  "into": "collection_materials_user_done",
+                  "into": "collection_cards",
                   "on": "_id",
                   "whenMatched": "merge",
                   "whenNotMatched": "insert"
@@ -2726,150 +2985,7 @@
             ],
             "purpose": "Giảm số lượt làm bài còn lại và lưu thông tin bài tập đã hoàn thành.",
             "data_input_from_node": ["collection_materials_user_done"],
-            "data_output_to_node": ["collection_materials_user_done"]
-          },
-          {
-            "pipeline": [
-              {
-                "$match": {
-                  "user_id": { "$exists": true },
-                  "transaction_type": "payment",
-                  "amount": 10000,
-                  "status": "completed"
-                }
-              },
-              {
-                "$lookup": {
-                  "from": "collection_materials_user_done",
-                  "localField": "user_id",
-                  "foreignField": "user_id",
-                  "as": "user_materials"
-                }
-              },
-              {
-                "$unwind": "$user_materials"
-              },
-              {
-                "$addFields": {
-                  "user_materials.remaining_attempts": {
-                    "$add": ["$user_materials.remaining_attempts", 5]
-                  }
-                }
-              },
-              {
-                "$merge": {
-                  "into": "collection_materials_user_done",
-                  "on": "_id",
-                  "whenMatched": "merge",
-                  "whenNotMatched": "insert"
-                }
-              }
-            ],
-            "purpose": "Mở khóa thêm lượt làm bài sau khi người dùng thanh toán 10k.",
-            "data_input_from_node": ["collection_user_transactions"],
-            "data_output_to_node": ["collection_materials_user_done"]
-          },
-          {
-            "pipeline": [
-              {
-                "$match": {
-                  "last_reset_time": { "$exists": true },
-                  "$expr": {
-                    "$lt": [
-                      "$last_reset_time",
-                      {
-                        "$add": [
-                          {
-                            "$dateTrunc": {
-                              "date": "$$NOW",
-                              "unit": "day",
-                              "binSize": 1,
-                              "timezone": "Asia/Ho_Chi_Minh"
-                            }
-                          },
-                          { "$literal": 25200000 }
-                        ]
-                      }
-                    ]
-                  }
-                }
-              },
-              {
-                "$lookup": {
-                  "from": "collection_materials_user_done",
-                  "localField": "user_id",
-                  "foreignField": "user_id",
-                  "as": "user_materials"
-                }
-              },
-              {
-                "$unwind": "$user_materials"
-              },
-              {
-                "$addFields": {
-                  "refund_amount": {
-                    "$multiply": [
-                      {
-                        "$subtract": [5, "$user_materials.remaining_attempts"]
-                      },
-                      2000
-                    ]
-                  }
-                }
-              },
-              {
-                "$match": {
-                  "refund_amount": { "$gt": 0 }
-                }
-              },
-              {
-                "$merge": {
-                  "into": "collection_cards",
-                  "on": "user_id",
-                  "whenMatched": [
-                    {
-                      "$set": {
-                        "balance": { "$add": ["$balance", "$refund_amount"] }
-                      }
-                    }
-                  ],
-                  "whenNotMatched": "insert"
-                }
-              },
-              {
-                "$merge": {
-                  "into": "collection_user_transactions",
-                  "on": "_id",
-                  "whenMatched": [
-                    {
-                      "$set": {
-                        "refund_amount": "$refund_amount",
-                        "refund_time": "$$NOW",
-                        "status": "refunded"
-                      }
-                    }
-                  ],
-                  "whenNotMatched": "insert"
-                }
-              },
-              {
-                "$set": {
-                  "user_materials.remaining_attempts": 0,
-                  "last_reset_time": { "$now": [] }
-                }
-              },
-              {
-                "$merge": {
-                  "into": "collection_materials_user_done",
-                  "on": "_id",
-                  "whenMatched": "merge",
-                  "whenNotMatched": "insert"
-                }
-              }
-            ],
-            "purpose": "Reset số lượng bài tập và lượt làm bài còn lại vào lúc 7:00 AM hằng ngày.",
-            "data_input_from_node": ["collection_materials_user_done"],
-            "data_output_to_node": ["collection_materials_user_done"]
+            "data_output_to_node": ["collection_cards"]
           }
         ]
       }
@@ -5054,318 +5170,314 @@
     }
   },
 
-  [
-    {
-      "_id": "matching_elite_learner",
-      "public": {
-        "node_data": {
-          "jsonSchema": {
-            "title": "MatchingLogData",
-            "type": "object",
-            "properties": {
-              "_id": { "type": "string" },
-              "elite_id": {
-                "type": "string",
-                "description": "ID của Elite Partner."
-              },
-              "learner_id": {
-                "type": "string",
-                "description": "ID của Learner."
-              },
-              "matched_at": {
-                "type": "string",
-                "format": "date-time",
-                "description": "Thời điểm ghép cặp."
-              },
-              "end_at": {
-                "type": "string",
-                "format": "date-time",
-                "description": "Thời điểm kết thúc mối quan hệ matching."
-              },
-              "status": {
-                "type": "string",
-                "enum": ["pending", "active", "terminated"],
-                "description": "Trạng thái của mối quan hệ matching."
-              },
-              "log": {
-                "type": "object",
-                "properties": {
-                  "elite_rank": {
-                    "type": "integer",
-                    "description": "Thứ hạng của Elite Partner."
-                  },
-                  "learner_rank": {
-                    "type": "integer",
-                    "description": "Thứ hạng của Learner."
-                  }
+  {
+    "_id": "matching_elite_learner",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "title": "MatchingLogData",
+          "type": "object",
+          "properties": {
+            "_id": { "type": "string" },
+            "elite_id": {
+              "type": "string",
+              "description": "ID của Elite Partner."
+            },
+            "learner_id": {
+              "type": "string",
+              "description": "ID của Learner."
+            },
+            "matched_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời điểm ghép cặp."
+            },
+            "end_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời điểm kết thúc mối quan hệ matching."
+            },
+            "status": {
+              "type": "string",
+              "enum": ["pending", "active", "terminated"],
+              "description": "Trạng thái của mối quan hệ matching."
+            },
+            "log": {
+              "type": "object",
+              "properties": {
+                "elite_rank": {
+                  "type": "integer",
+                  "description": "Thứ hạng của Elite Partner."
+                },
+                "learner_rank": {
+                  "type": "integer",
+                  "description": "Thứ hạng của Learner."
                 }
-              },
-              "wants_matching": {
-                "type": "boolean",
-                "description": "Learner có muốn tìm kiếm sự hỗ trợ từ Elite hay không."
-              },
-              "signature": {
-                "type": "string",
-                "description": "Chữ ký số của Learner nếu họ đồng ý matching."
               }
             },
-            "required": [
-              "_id",
-              "elite_id",
-              "learner_id",
-              "matched_at",
-              "end_at",
-              "status",
-              "log",
-              "wants_matching"
-            ],
-            "additionalProperties": false
-          },
-          "jsonSample": [
-            {
-              "_id": "12345_67890_2025-01-01T00:00:00Z",
-              "elite_id": "12345",
-              "learner_id": "67890",
-              "matched_at": "2025-01-01T00:00:00Z",
-              "end_at": "2025-01-08T00:00:00Z",
-              "status": "pending",
-              "log": {
-                "elite_rank": 1,
-                "learner_rank": 10
-              },
-              "wants_matching": true,
-              "signature": "signature_of_learner"
+            "wants_matching": {
+              "type": "boolean",
+              "description": "Learner có muốn tìm kiếm sự hỗ trợ từ Elite hay không."
             },
-            {
-              "_id": "54321_09876_2025-01-02T00:00:00Z",
-              "elite_id": "54321",
-              "learner_id": "09876",
-              "matched_at": "2025-01-02T00:00:00Z",
-              "end_at": "2025-01-09T00:00:00Z",
-              "status": "active",
-              "log": {
-                "elite_rank": 2,
-                "learner_rank": 20
-              },
-              "wants_matching": true,
-              "signature": "signature_of_learner"
+            "signature": {
+              "type": "string",
+              "description": "Chữ ký số của Learner nếu họ đồng ý matching."
             }
-          ]
-        }
-      },
-      "private": {
-        "node_function": {
-          "edge": [
-            {
-              "pipeline": [
-                {
-                  "$match": {
-                    "status": "pending",
-                    "wants_matching": true
-                  }
-                },
-                {
-                  "$lookup": {
-                    "from": "collection_cards",
-                    "localField": "learner_id",
-                    "foreignField": "user_id",
-                    "as": "card_data"
-                  }
-                },
-                {
-                  "$unwind": "$card_data"
-                },
-                {
-                  "$addFields": {
-                    "signature": "$card_data.signature",
-                    "is_signature_valid": true
-                  }
-                },
-                {
-                  "$merge": {
-                    "into": "matching_logs",
-                    "on": "_id",
-                    "whenMatched": "merge",
-                    "whenNotMatched": "insert"
-                  }
-                }
-              ],
-              "purpose": "Pipeline xử lý matching dựa trên lựa chọn của Learner.",
-              "data_input_from_node": [
-                "matching_elite_learner",
-                "collection_cards"
-              ],
-              "data_output_to_node": "matching_logs"
+          },
+          "required": [
+            "_id",
+            "elite_id",
+            "learner_id",
+            "matched_at",
+            "end_at",
+            "status",
+            "log",
+            "wants_matching"
+          ],
+          "additionalProperties": false
+        },
+        "jsonSample": [
+          {
+            "_id": "12345_67890_2025-01-01T00:00:00Z",
+            "elite_id": "12345",
+            "learner_id": "67890",
+            "matched_at": "2025-01-01T00:00:00Z",
+            "end_at": "2025-01-08T00:00:00Z",
+            "status": "pending",
+            "log": {
+              "elite_rank": 1,
+              "learner_rank": 10
             },
-            {
-              "pipeline": [
-                {
-                  "$match": {
-                    "is_elite_partner": true,
-                    "status": "active"
-                  }
-                },
+            "wants_matching": true,
+            "signature": "signature_of_learner"
+          },
+          {
+            "_id": "54321_09876_2025-01-02T00:00:00Z",
+            "elite_id": "54321",
+            "learner_id": "09876",
+            "matched_at": "2025-01-02T00:00:00Z",
+            "end_at": "2025-01-09T00:00:00Z",
+            "status": "active",
+            "log": {
+              "elite_rank": 2,
+              "learner_rank": 20
+            },
+            "wants_matching": true,
+            "signature": "signature_of_learner"
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "status": "pending",
+                  "wants_matching": true
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "learner_id",
+                  "foreignField": "user_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$addFields": {
+                  "signature": "$card_data.signature",
+                  "is_signature_valid": true
+                }
+              },
+              {
+                "$merge": {
+                  "into": "matching_logs",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Pipeline xử lý matching dựa trên lựa chọn của Learner.",
+            "data_input_from_node": [
+              "matching_elite_learner",
+              "collection_cards"
+            ],
+            "data_output_to_node": "matching_logs"
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "is_elite_partner": true,
+                  "status": "active"
+                }
+              },
 
-                {
-                  "$lookup": {
-                    "from": "collection_leaderboard",
-                    "localField": "user_id",
-                    "foreignField": "user_id",
-                    "as": "leaderboard_data"
-                  }
-                },
-                {
-                  "$unwind": "$leaderboard_data"
-                },
-                {
-                  "$addFields": {
-                    "elite_rank": "$leaderboard_data.rank"
-                  }
-                },
+              {
+                "$lookup": {
+                  "from": "collection_leaderboard",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "leaderboard_data"
+                }
+              },
+              {
+                "$unwind": "$leaderboard_data"
+              },
+              {
+                "$addFields": {
+                  "elite_rank": "$leaderboard_data.rank"
+                }
+              },
 
-                {
-                  "$lookup": {
-                    "from": "collection_leaderboard",
-                    "let": { "current_user_id": "$user_id" },
-                    "pipeline": [
-                      {
-                        "$match": {
-                          "$expr": {
-                            "$and": [
-                              { "$ne": ["$user_id", "$$current_user_id"] },
-                              {
-                                "$or": [
-                                  { "$gt": ["$rank", 20] },
-                                  { "$eq": ["$rank", null] }
-                                ]
-                              },
-                              { "$eq": ["$wants_matching", true] }
-                            ]
-                          }
+              {
+                "$lookup": {
+                  "from": "collection_leaderboard",
+                  "let": { "current_user_id": "$user_id" },
+                  "pipeline": [
+                    {
+                      "$match": {
+                        "$expr": {
+                          "$and": [
+                            { "$ne": ["$user_id", "$$current_user_id"] },
+                            {
+                              "$or": [
+                                { "$gt": ["$rank", 20] },
+                                { "$eq": ["$rank", null] }
+                              ]
+                            },
+                            { "$eq": ["$wants_matching", true] }
+                          ]
                         }
                       }
-                    ],
-                    "as": "eligible_learners"
-                  }
-                },
-                {
-                  "$unwind": "$eligible_learners"
-                },
-
-                {
-                  "$lookup": {
-                    "from": "matching_logs",
-                    "localField": "user_id",
-                    "foreignField": "elite_id",
-                    "as": "existing_matches"
-                  }
-                },
-                {
-                  "$addFields": {
-                    "current_match_count": { "$size": "$existing_matches" }
-                  }
-                },
-                {
-                  "$match": {
-                    "current_match_count": { "$lt": 3 }
-                  }
-                },
-
-                {
-                  "$lookup": {
-                    "from": "matching_logs",
-                    "localField": "eligible_learners.user_id",
-                    "foreignField": "learner_id",
-                    "as": "learner_existing_matches"
-                  }
-                },
-                {
-                  "$addFields": {
-                    "learner_existing_match_count": {
-                      "$size": "$learner_existing_matches"
                     }
-                  }
-                },
-                {
-                  "$match": {
-                    "learner_existing_match_count": 0
-                  }
-                },
+                  ],
+                  "as": "eligible_learners"
+                }
+              },
+              {
+                "$unwind": "$eligible_learners"
+              },
 
-                {
-                  "$addFields": {
-                    "learner_id": "$eligible_learners.user_id",
-                    "learner_rank": "$eligible_learners.rank",
-                    "matched_at": "$$NOW",
-                    "end_at": {
-                      "$dateAdd": {
-                        "startDate": "$$NOW",
-                        "unit": "week",
-                        "amount": 1
-                      }
-                    },
-                    "status": "pending",
-                    "wants_matching": true
-                  }
-                },
+              {
+                "$lookup": {
+                  "from": "matching_logs",
+                  "localField": "user_id",
+                  "foreignField": "elite_id",
+                  "as": "existing_matches"
+                }
+              },
+              {
+                "$addFields": {
+                  "current_match_count": { "$size": "$existing_matches" }
+                }
+              },
+              {
+                "$match": {
+                  "current_match_count": { "$lt": 3 }
+                }
+              },
 
-                {
-                  "$project": {
-                    "_id": {
-                      "$concat": [
-                        "$user_id",
-                        "_",
-                        "$eligible_learners.user_id",
-                        "_",
-                        { "$toString": "$$NOW" }
-                      ]
-                    },
-                    "elite_id": "$user_id",
-                    "learner_id": 1,
-                    "matched_at": 1,
-                    "end_at": 1,
-                    "status": 1,
-                    "log": {
-                      "elite_rank": "$elite_rank",
-                      "learner_rank": "$learner_rank"
-                    },
-                    "wants_matching": 1,
-                    "signature": "$eligible_learners.user_id"
-                  }
-                },
-
-                {
-                  "$merge": {
-                    "into": "matching_logs",
-                    "on": "_id",
-                    "whenMatched": "merge",
-                    "whenNotMatched": "insert"
+              {
+                "$lookup": {
+                  "from": "matching_logs",
+                  "localField": "eligible_learners.user_id",
+                  "foreignField": "learner_id",
+                  "as": "learner_existing_matches"
+                }
+              },
+              {
+                "$addFields": {
+                  "learner_existing_match_count": {
+                    "$size": "$learner_existing_matches"
                   }
                 }
-              ],
-              "purpose": "Pipeline for automatically matching Elite Partners with Learners based on rank and status.",
-              "data_input_from_node": [
-                "elite_partners",
-                "leaderboard",
-                "matching_logs"
-              ],
-              "data_output_to_node": "matching_logs"
-            }
-          ]
-        }
-      },
-      "personal": {
-        "node_info": {
-          "name": "English Test System",
-          "author": "Joshept",
-          "version": "1.0",
-          "year": "2025"
-        }
+              },
+              {
+                "$match": {
+                  "learner_existing_match_count": 0
+                }
+              },
+
+              {
+                "$addFields": {
+                  "learner_id": "$eligible_learners.user_id",
+                  "learner_rank": "$eligible_learners.rank",
+                  "matched_at": "$$NOW",
+                  "end_at": {
+                    "$dateAdd": {
+                      "startDate": "$$NOW",
+                      "unit": "week",
+                      "amount": 1
+                    }
+                  },
+                  "status": "pending",
+                  "wants_matching": true
+                }
+              },
+
+              {
+                "$project": {
+                  "_id": {
+                    "$concat": [
+                      "$user_id",
+                      "_",
+                      "$eligible_learners.user_id",
+                      "_",
+                      { "$toString": "$$NOW" }
+                    ]
+                  },
+                  "elite_id": "$user_id",
+                  "learner_id": 1,
+                  "matched_at": 1,
+                  "end_at": 1,
+                  "status": 1,
+                  "log": {
+                    "elite_rank": "$elite_rank",
+                    "learner_rank": "$learner_rank"
+                  },
+                  "wants_matching": 1,
+                  "signature": "$eligible_learners.user_id"
+                }
+              },
+
+              {
+                "$merge": {
+                  "into": "matching_logs",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Pipeline for automatically matching Elite Partners with Learners based on rank and status.",
+            "data_input_from_node": [
+              "elite_partners",
+              "leaderboard",
+              "matching_logs"
+            ],
+            "data_output_to_node": "matching_logs"
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
       }
     }
-  ]
-  ,
-
+  },
   {
     "_id": "supporting_feedback",
     "public": {
@@ -5865,6 +5977,14 @@
           }
         ]
       }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
     }
   },
 
@@ -6107,7 +6227,7 @@
               },
               {
                 "$lookup": {
-                  "from": "collection_materials_user_done",
+                  "from": "collection_cards",
                   "localField": "user_id",
                   "foreignField": "user_id",
                   "as": "user_materials"
@@ -6133,7 +6253,7 @@
               },
               {
                 "$merge": {
-                  "into": "collection_materials_user_done",
+                  "into": "collection_cards",
                   "on": "user_id",
                   "whenMatched": "merge",
                   "whenNotMatched": "insert"
@@ -6152,7 +6272,6 @@
             "data_input_from_node": ["collection_user_transactions"],
             "data_output_to_node": [
               "collection_cards",
-              "collection_materials_user_done",
               "collection_user_transactions"
             ]
           },
@@ -6171,7 +6290,7 @@
               },
               {
                 "$merge": {
-                  "into": "collection_materials_user_done",
+                  "into": "collection_cards",
                   "on": "user_id",
                   "whenMatched": "merge",
                   "whenNotMatched": "insert"
@@ -6179,8 +6298,8 @@
               }
             ],
             "purpose": "Reset remaining_attempts về 2 nếu người dùng không sử dụng hết.",
-            "data_input_from_node": ["collection_materials_user_done"],
-            "data_output_to_node": ["collection_materials_user_done"]
+            "data_input_from_node": ["collection_cards"],
+            "data_output_to_node": ["collection_cards"]
           },
           {
             "pipeline": [
