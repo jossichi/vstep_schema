@@ -6131,7 +6131,9 @@
               {
                 "$match": {
                   "user_OTP": { "$exists": true },
-                  "transaction_type": "payment"
+                  "user_id": { "$exists": true },
+                  "transaction_type": "payment",
+                  "status": "pending"
                 }
               },
               {
@@ -6146,8 +6148,25 @@
                 "$unwind": "$card_data"
               },
               {
+                "$addFields": {
+                  "is_OTP_valid": {
+                    "$eq": ["$user_OTP", "$card_data.user_OTP"]
+                  },
+                  "created_at": "$$NOW",
+                  "expiration_time": {
+                    "$dateAdd": {
+                      "startDate": "$$NOW",
+                      "unit": "second",
+                      "amount": 60
+                    }
+                  }
+                }
+              },
+              {
                 "$match": {
-                  "card_data.user_OTP": "$OTP_input"
+                  "is_OTP_valid": true,
+                  "status": "pending",
+                  "expiration_time": { "$gte": "$$NOW" }
                 }
               },
               {
@@ -6162,9 +6181,44 @@
                   "whenMatched": "merge",
                   "whenNotMatched": "insert"
                 }
+              },
+              {
+                "$addFields": {
+                  "is_signature_valid": {
+                    "$cond": {
+                      "if": { "$eq": ["$signature", "CLIENT_SIGNATURE"] },
+                      "then": true,
+                      "else": false
+                    }
+                  }
+                }
+              },
+              {
+                "$set": {
+                  "status": {
+                    "$cond": {
+                      "if": {
+                        "$and": [
+                          "$is_signature_valid",
+                          { "$lte": ["$$NOW", "$expiration_time"] }
+                        ]
+                      },
+                      "then": "completed",
+                      "else": "failed"
+                    }
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "fail"
+                }
               }
             ],
-            "purpose": "Xác thực giao dịch bằng OTP và chữ ký số.",
+            "purpose": "Xác thực OTP và chữ ký số của người dùng trước khi hoàn tất giao dịch.",
             "data_input_from_node": ["collection_cards"],
             "data_output_to_node": ["collection_user_transactions"]
           },
@@ -6269,6 +6323,53 @@
               }
             ],
             "purpose": "Xử lý từng bước trong chuỗi giao dịch blockchain-style, trừ tiền từ collection_cards.balance và tăng remaining_attempts.",
+            "data_input_from_node": ["collection_user_transactions"],
+            "data_output_to_node": [
+              "collection_cards",
+              "collection_user_transactions"
+            ]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "_id": "TRANSACTION_ID",
+                  "status": "pending"
+                }
+              },
+              {
+                "$addFields": {
+                  "is_signature_valid": {
+                    "$eq": ["$signature", "CLIENT_SIGNATURE"]
+                  },
+                  "is_within_time_limit": {
+                    "$lte": ["$$NOW", "$expiration_time"]
+                  }
+                }
+              },
+              {
+                "$set": {
+                  "status": {
+                    "$cond": {
+                      "if": {
+                        "$and": ["$is_signature_valid", "$is_within_time_limit"]
+                      },
+                      "then": "completed",
+                      "else": "failed"
+                    }
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "fail"
+                }
+              }
+            ],
+            "purpose": "Xác thực chữ ký số và thời gian giao dịch.",
             "data_input_from_node": ["collection_user_transactions"],
             "data_output_to_node": [
               "collection_cards",
