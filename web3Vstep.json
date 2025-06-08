@@ -738,11 +738,7 @@
               "unique": true,
               "description": "Mã định danh duy nhất của thẻ dành cho admin (định dạng AC-<ECDSA>)"
             },
-            "admin_id": {
-              "type": "string",
-              "unique": true,
-              "description": "ID người dùng (định dạng ADMIN-<UUID>)"
-            },
+
             "admin_signature": {
               "type": "string",
               "description": "Chữ ký số được tạo bởi ví của người dùng là admin"
@@ -5648,6 +5644,16 @@
               },
               "required": ["comments", "suggestions"]
             },
+            "learner_reactions": [
+              {
+                "reaction_type": {
+                  "type": "string",
+                  "enum": ["like", "dislike", "neutral"]
+                },
+                "comment": "string",
+                "created_at": "date-time"
+              }
+            ],
             "created_at": {
               "type": "string",
               "format": "date-time",
@@ -5668,41 +5674,74 @@
         },
         "jsonSample": [
           {
-            "_id": "feedback_001",
-            "matching_id": "match_001",
-            "elite_id": "ELITE_001",
-            "learner_id": "USER_LB_003",
+            "_id": "60c72b2f9b1e8c001c8e4d3a",
+            "matching_id": "60c72b2f9b1e8c001c8e4d39",
+            "elite_id": "60c72b2f9b1e8c001c8e4d38",
+            "learner_id": "60c72b2f9b1e8c001c8e4d37",
             "practice_results": {
               "listening_score": 85,
-              "reading_score": 78,
+              "reading_score": 90,
               "writing_score": 80,
-              "speaking_score": 90
+              "speaking_score": 75
             },
             "completed_materials": [
               {
-                "material_id": "mat_001",
+                "material_id": "60c72b2f9b1e8c001c8e4d36",
                 "section": "listening",
                 "part": 1,
-                "score": 90
+                "score": 85
               },
               {
-                "material_id": "mat_002",
+                "material_id": "60c72b2f9b1e8c001c8e4d35",
                 "section": "reading",
                 "part": 2,
-                "score": 85
+                "score": 90
               }
             ],
             "feedback": {
               "comments": [
-                "Learner có kỹ năng nghe rất tốt nhưng cần cải thiện phần đọc hiểu.",
-                "Phần nói rất tự tin và rõ ràng."
+                "Great progress in listening skills.",
+                "Reading comprehension is excellent."
               ],
               "suggestions": [
-                "Hãy luyện tập thêm về ngữ pháp trong phần viết.",
-                "Cố gắng đọc nhiều văn bản tiếng Anh hơn để cải thiện vốn từ vựng."
+                "Focus on writing practice.",
+                "Improve speaking fluency."
               ]
             },
-            "created_at": "2025-02-16T12:00:00.000Z"
+            "learner_reactions": [],
+            "created_at": "2025-01-01T12:00:00Z"
+          },
+          {
+            "_id": "60c72b2f9b1e8c001c8e4d3b",
+            "matching_id": "60c72b2f9b1e8c001c8e4d3a",
+            "elite_id": "60c72b2f9b1e8c001c8e4d39",
+            "learner_id": "60c72b2f9b1e8c001c8e4d38",
+            "practice_results": {
+              "listening_score": 78,
+              "reading_score": 82,
+              "writing_score": 88,
+              "speaking_score": 80
+            },
+            "completed_materials": [
+              {
+                "material_id": "60c72b2f9b1e8c001c8e4d34",
+                "section": "writing",
+                "part": 3,
+                "score": 88
+              }
+            ],
+            "feedback": {
+              "comments": [
+                "Writing skills have improved significantly.",
+                "Speaking needs more practice."
+              ],
+              "suggestions": [
+                "Continue with writing exercises.",
+                "Engage in more speaking activities."
+              ]
+            },
+            "learner_reactions": ["like"],
+            "created_at": "2025-01-02T12:00:00Z"
           }
         ]
       }
@@ -5788,6 +5827,42 @@
               "collection_user_practice_results",
               "collection_materials_user_done"
             ],
+            "data_output_to_node": "supporting_feedback"
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "_id": "feedback_001"
+                }
+              },
+              {
+                "$addFields": {
+                  "learner_reactions": {
+                    "$concatArrays": [
+                      "$learner_reactions",
+                      [
+                        {
+                          "reaction_type": "$input.reaction_type",
+                          "comment": "$input.comment",
+                          "created_at": "$$NOW"
+                        }
+                      ]
+                    ]
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "supporting_feedback",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Pipeline for adding learner reactions to existing feedback.",
+            "data_input_from_node": ["supporting_feedback"],
             "data_output_to_node": "supporting_feedback"
           }
         ]
