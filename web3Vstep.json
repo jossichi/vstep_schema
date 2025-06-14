@@ -1610,7 +1610,7 @@
               },
               {
                 "$merge": {
-                  "into": "collection_mentor_students",
+                  "into": "collection_elite_partner",
                   "on": "_id",
                   "whenMatched": "merge",
                   "whenNotMatched": "insert"
@@ -1619,7 +1619,7 @@
             ],
             "purpose": "Tìm mentor phù hợp cho user sau khi hoàn thành bài test.",
             "data_input_from_node": ["collection_user_tests"],
-            "data_output_to_node": ["collection_mentor_students"]
+            "data_output_to_node": ["collection_elite_partner"]
           }
         ]
       }
@@ -6684,47 +6684,86 @@
           "properties": {
             "_id": {
               "type": "string",
-              "description": "ID duy nhất của bản ghi."
+              "description": "ID duy nhất của bản ghi, ví dụ: 'revenue_2025_06_14'"
             },
             "date": {
               "type": "string",
               "format": "date",
-              "description": "Ngày tính doanh thu (YYYY-MM-DD)."
+              "description": "Ngày ghi nhận doanh thu (YYYY-MM-DD)."
             },
             "total_amount": {
               "type": "integer",
               "minimum": 0,
-              "description": "Tổng số tiền nạp vào hệ thống trong ngày."
+              "description": "Tổng số tiền thu từ người dùng (đã bao gồm thuế GTGT)."
             },
+
             "system_share_gross": {
               "type": "integer",
               "minimum": 0,
-              "description": "Phần doanh thu thuộc về hệ thống trước thuế (70%)."
+              "description": "Phần doanh thu hệ thống trước thuế (VD: 70%)."
             },
             "admin_share_gross": {
               "type": "integer",
               "minimum": 0,
-              "description": "Phần doanh thu thuộc về admin trước thuế (30%)."
+              "description": "Phần doanh thu chia cho admin (trường học hoặc cá nhân) trước thuế (VD: 30%)."
             },
-            "tax_system": {
+
+            "admin_entity_type": {
+              "type": "string",
+              "enum": ["individual", "organization"],
+              "description": "Xác định admin là cá nhân hay tổ chức (trường học)."
+            },
+
+            "admin_tax_code": {
+              "type": "string",
+              "description": "Mã số thuế của đơn vị admin (nếu là tổ chức).",
+              "nullable": true
+            },
+
+            "admin_invoice_type": {
+              "type": "string",
+              "enum": [
+                "vat_invoice",
+                "no_invoice",
+                "receipt",
+                "internal_transfer"
+              ],
+              "description": "Loại chứng từ admin cung cấp: hóa đơn VAT, biên nhận, hoặc không có."
+            },
+
+            "tax_system_vat": {
               "type": "integer",
               "minimum": 0,
-              "description": "Thuế GTGT của phần doanh thu hệ thống (5%)."
+              "description": "Thuế GTGT đầu ra mà hệ thống phải nộp (10% phần system_share_gross)."
             },
-            "tax_admin": {
+
+            "tax_admin_withheld": {
               "type": "integer",
               "minimum": 0,
-              "description": "Thuế GTGT của phần doanh thu admin (5%)."
+              "description": "Thuế khấu trừ từ admin nếu là cá nhân (TNCN 10%) — nếu là tổ chức thì bằng 0."
             },
+
             "system_share_net": {
               "type": "integer",
               "minimum": 0,
-              "description": "Phần doanh thu thực lĩnh của hệ thống sau thuế."
+              "description": "Số tiền hệ thống thực nhận sau thuế VAT và nghĩa vụ khác."
             },
             "admin_share_net": {
               "type": "integer",
               "minimum": 0,
-              "description": "Phần doanh thu thực lĩnh của admin sau thuế."
+              "description": "Số tiền admin (trường học/cá nhân) thực nhận sau các nghĩa vụ thuế hoặc khấu trừ."
+            },
+
+            "is_tax_compliant": {
+              "type": "boolean",
+              "default": false,
+              "description": "Đơn vị admin đã cung cấp đủ hóa đơn/chứng từ để hợp pháp hóa chi phí."
+            },
+
+            "notes": {
+              "type": "string",
+              "maxLength": 300,
+              "description": "Ghi chú thêm: ví dụ mã hợp đồng, trạng thái chứng từ, ghi nhận kế toán."
             }
           },
           "required": [
@@ -6733,35 +6772,32 @@
             "total_amount",
             "system_share_gross",
             "admin_share_gross",
-            "tax_system",
-            "tax_admin",
+            "admin_entity_type",
+            "admin_invoice_type",
+            "tax_system_vat",
+            "tax_admin_withheld",
             "system_share_net",
-            "admin_share_net"
+            "admin_share_net",
+            "is_tax_compliant"
           ],
           "additionalProperties": false
         },
         "jsonSample": [
           {
-            "_id": "revenue_2025_02_14",
-            "date": "2025-02-14",
+            "_id": "revenue_2025_06_14",
+            "date": "2025-06-14",
             "total_amount": 1000000,
             "system_share_gross": 700000,
             "admin_share_gross": 300000,
-            "tax_system": 35000,
-            "tax_admin": 15000,
-            "system_share_net": 665000,
-            "admin_share_net": 285000
-          },
-          {
-            "_id": "revenue_2025_02_15",
-            "date": "2025-02-15",
-            "total_amount": 1200000,
-            "system_share_gross": 840000,
-            "admin_share_gross": 360000,
-            "tax_system": 42000,
-            "tax_admin": 18000,
-            "system_share_net": 798000,
-            "admin_share_net": 342000
+            "admin_entity_type": "individual",
+            "admin_tax_code": null,
+            "admin_invoice_type": "vat_invoice",
+            "tax_system_vat": 70000,
+            "tax_admin_withheld": 30000,
+            "system_share_net": 630000,
+            "admin_share_net": 270000,
+            "is_tax_compliant": true,
+            "notes": "Hợp đồng số 12345, đã cung cấp hóa đơn VAT."
           }
         ]
       }
@@ -6776,72 +6812,270 @@
                   "transaction_type": "payment",
                   "status": "completed",
                   "created_at": {
-                    "$gte": {
-                      "$dateTrunc": {
-                        "date": "$$NOW",
-                        "unit": "day",
-                        "binSize": 1,
-                        "timezone": "Asia/Ho_Chi_Minh"
-                      }
-                    },
-                    "$lt": {
-                      "$add": [
-                        {
-                          "$dateTrunc": {
-                            "date": "$$NOW",
-                            "unit": "day",
-                            "binSize": 1,
-                            "timezone": "Asia/Ho_Chi_Minh"
-                          }
-                        },
-                        86400000
-                      ]
+                    "$exists": true
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "created_date": {
+                    "$dateToString": {
+                      "format": "%Y-%m-%d",
+                      "date": {
+                        "$toDate": "$created_at"
+                      },
+                      "timezone": "Asia/Ho_Chi_Minh"
                     }
                   }
                 }
               },
               {
                 "$group": {
-                  "_id": null,
-                  "total_amount": { "$sum": "$amount" }
+                  "_id": "$created_date",
+                  "total_amount": {
+                    "$sum": "$amount"
+                  }
                 }
               },
               {
                 "$addFields": {
-                  "date": {
-                    "$dateToString": {
-                      "format": "%Y-%m-%d",
-                      "date": "$$NOW",
-                      "timezone": "Asia/Ho_Chi_Minh"
-                    }
+                  "date": "$_id",
+                  "system_share_gross": {
+                    "$multiply": ["$total_amount", 0.7]
                   },
-                  "system_share_gross": { "$multiply": ["$total_amount", 0.7] },
-                  "admin_share_gross": { "$multiply": ["$total_amount", 0.3] },
-                  "tax_system": { "$multiply": ["$total_amount", 0.7, 0.05] },
-                  "tax_admin": { "$multiply": ["$total_amount", 0.3, 0.05] },
-                  "system_share_net": {
-                    "$subtract": [
-                      { "$multiply": ["$total_amount", 0.7] },
-                      { "$multiply": ["$total_amount", 0.7, 0.05] }
+                  "admin_share_gross": {
+                    "$multiply": ["$total_amount", 0.3]
+                  },
+                  "admin_entity_type": {
+                    "$literal": "organization"
+                  },
+
+                  "admin_invoice_type": {
+                    "$literal": "vat_invoice"
+                  }
+                }
+              },
+
+              {
+                "$addFields": {
+                  "tax_system_vat": {
+                    "$multiply": ["$system_share_gross", 0.1]
+                  },
+                  "tax_admin_withheld": {
+                    "$cond": [
+                      {
+                        "$eq": ["$admin_entity_type", "individual"]
+                      },
+                      {
+                        "$multiply": ["$admin_share_gross", 0.1]
+                      },
+                      0
                     ]
+                  }
+                }
+              },
+
+              {
+                "$addFields": {
+                  "system_share_net": {
+                    "$subtract": ["$system_share_gross", "$tax_system_vat"]
                   },
                   "admin_share_net": {
-                    "$subtract": [
-                      { "$multiply": ["$total_amount", 0.3] },
-                      { "$multiply": ["$total_amount", 0.3, 0.05] }
+                    "$subtract": ["$admin_share_gross", "$tax_admin_withheld"]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "_id": {
+                    "$concat": [
+                      "revenue_",
+                      {
+                        "$replaceAll": {
+                          "input": "$_id",
+                          "find": "-",
+                          "replacement": "_"
+                        }
+                      }
                     ]
                   }
                 }
               },
               {
+                "$project": {
+                  "_id": 1,
+                  "date": 1,
+                  "total_amount": 1,
+                  "system_share_gross": 1,
+                  "admin_share_gross": 1,
+                  "tax_system_vat": 1,
+                  "tax_admin_withheld": 1,
+                  "system_share_net": 1,
+                  "admin_share_net": 1,
+                  "admin_entity_type": 1,
+                  "admin_tax_code": 1,
+                  "admin_invoice_type": 1,
+                  "is_tax_compliant": 1,
+                  "notes": 1
+                }
+              },
+              {
                 "$merge": {
                   "into": "collection_system_revenue",
-                  "on": "date",
+                  "on": "_id",
                   "whenMatched": "merge",
                   "whenNotMatched": "insert"
                 }
               }
-            ]
+            ],
+            "purpose": "Tính toán doanh thu hệ thống từ các giao dịch thanh toán đã hoàn thành.",
+            "data_input_from_node": "collection_transactions",
+            "data_output_to_node": "collection_system_revenue"
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "transaction_type": "payment",
+                  "status": "completed",
+                  "created_at": { "$exists": true }
+                }
+              },
+              {
+                "$addFields": {
+                  "created_month": {
+                    "$dateToString": {
+                      "format": "%Y-%m",
+                      "date": { "$toDate": "$created_at" },
+                      "timezone": "Asia/Ho_Chi_Minh"
+                    }
+                  }
+                }
+              },
+              {
+                "$group": {
+                  "_id": "$created_month",
+                  "total_amount": { "$sum": "$amount" }
+                }
+              },
+              {
+                "$addFields": {
+                  "date": "$_id",
+                  "system_share_gross": {
+                    "$multiply": ["$total_amount", 0.7]
+                  },
+                  "admin_share_gross": {
+                    "$multiply": ["$total_amount", 0.3]
+                  },
+                  "admin_entity_type": {
+                    "$literal": "individual"
+                  },
+                  "admin_invoice_type": {
+                    "$literal": "vat_invoice"
+                  },
+                  "admin_tax_code": {
+                    "$cond": [
+                      {
+                        "$eq": ["$admin_entity_type", "organization"]
+                      },
+                      "TAX_123456789",
+                      null
+                    ]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "tax_system_vat": {
+                    "$multiply": ["$system_share_gross", 0.1]
+                  },
+                  "tax_admin_withheld": {
+                    "$cond": [
+                      {
+                        "$eq": ["$admin_entity_type", "individual"]
+                      },
+                      {
+                        "$multiply": ["$admin_share_gross", 0.1]
+                      },
+                      0
+                    ]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "system_share_net": {
+                    "$subtract": ["$system_share_gross", "$tax_system_vat"]
+                  },
+                  "admin_share_net": {
+                    "$subtract": ["$admin_share_gross", "$tax_admin_withheld"]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "_id": { "$concat": ["revenue_", "$_id"] },
+                  "is_tax_compliant": {
+                    "$cond": [
+                      {
+                        "$in": [
+                          "$admin_invoice_type",
+                          ["vat_invoice", "receipt"]
+                        ]
+                      },
+                      true,
+                      false
+                    ]
+                  },
+                  "notes": {
+                    "$cond": [
+                      {
+                        "$eq": ["$admin_invoice_type", "vat_invoice"]
+                      },
+                      "Đã xuất hóa đơn VAT cho tháng này.",
+                      {
+                        "$cond": [
+                          {
+                            "$eq": ["$admin_invoice_type", "receipt"]
+                          },
+                          "Biên nhận nội bộ.",
+                          "Chưa cung cấp chứng từ."
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "$project": {
+                  "_id": 1,
+                  "date": 1,
+                  "total_amount": 1,
+                  "system_share_gross": 1,
+                  "admin_share_gross": 1,
+                  "tax_system_vat": 1,
+                  "tax_admin_withheld": 1,
+                  "system_share_net": 1,
+                  "admin_share_net": 1,
+                  "admin_entity_type": 1,
+                  "admin_tax_code": 1,
+                  "admin_invoice_type": 1,
+                  "is_tax_compliant": 1,
+                  "notes": 1
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_system_revenue",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Tính toán doanh thu hệ thống theo tháng từ các giao dịch thanh toán đã hoàn thành.",
+            "data_input_from_node": "collection_transactions",
+            "data_output_to_node": "collection_system_revenue"
           }
         ]
       }
