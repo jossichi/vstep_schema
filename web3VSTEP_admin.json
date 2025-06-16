@@ -14,11 +14,7 @@
               "unique": true,
               "description": "Mã định danh duy nhất của thẻ dành cho admin (định dạng AC-<ECDSA>)"
             },
-            "admin_id": {
-              "type": "string",
-              "unique": true,
-              "description": "ID người dùng (định dạng ADMIN-<UUID>)"
-            },
+
             "public_key": {
               "type": "string",
               "description": "Khóa công khai để xác thực chữ ký số"
@@ -46,11 +42,12 @@
             "hashed_adminID": {
               "type": "string",
               "unique": true,
-              "description": "Giá trị băm của adminID"
+              "description": "Mã băm của ID admin (MÃ NHÂN VIÊN CỦA ADMIN) (định dạng ADMIN-<UUID>)"
             },
             "role": {
               "type": "string",
-              "enum": ["superadmin", "admin", "support"],
+              "enum": ["superadmin", "admin"],
+              "default": "admin",
               "description": "Vai trò của admin"
             },
             "permissions": {
@@ -67,23 +64,11 @@
               "type": "integer",
               "default": 0,
               "description": "Số phiên đăng nhập đang hoạt động"
-            },
-            "approval_status": {
-              "type": "string",
-              "enum": ["pending", "approved", "suspended"],
-              "default": "pending",
-              "description": "Trạng thái phê duyệt tài khoản admin"
-            },
-            "approved_by": {
-              "type": "string",
-              "nullable": true,
-              "description": "ID của admin phê duyệt tài khoản này"
             }
           },
           "required": [
             "_id",
             "admin_card_id",
-            "admin_id",
             "public_key",
             "qr_code",
             "token",
@@ -92,25 +77,7 @@
             "hashed_adminID"
           ]
         },
-        "jsonSample": [
-          {
-            "_id": "ADMIN_CARD001",
-            "admin_card_id": "AC123456789",
-            "admin_id": "ADMIN-1a2b3c4d5e6f7890",
-            "public_key": "-BEGIN PUBLIC KEY-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...",
-            "qr_code": "https://example.com/cards/AC123456789",
-            "admin_signature": "MEUCIQDZsVvXl9z2...c3RvbSBzaWduYXR1cmU=",
-            "status": "active",
-            "created_at": "2025-02-14T18:26:02.588Z",
-            "hashed_adminID": "a1b2c3d4e5f67890abcdef1234567890abcdef1234567890abcdef1234567890",
-            "role": "superadmin",
-            "permissions": ["create_card", "delete_user", "view_logs"],
-            "last_login": "2025-02-14T18:26:02.588Z",
-            "active_sessions": 2,
-            "approval_status": "approved",
-            "approved_by": "ADMIN-9876543210abcdef"
-          }
-        ]
+        "jsonSample": []
       }
     },
     "private": {
@@ -241,44 +208,224 @@
   },
 
   {
-    "_id": "admin_roles",
+    "_id": "admin_draft_tests",
     "public": {
       "node_data": {
         "jsonSchema": {
           "$schema": "http://json-schema.org/draft-07/schema#",
-          "title": "AdminRoleSchema",
+          "title": "DraftTestSchema",
           "type": "object",
           "properties": {
-            "_id": { "type": "string" },
-            "role": {
+            "_id": "string",
+            "test_id": "string",
+            "admin_card_id": {
               "type": "string",
-              "enum": ["admin", "support"],
-              "description": "Vai trò của admin"
+              "unique": true,
+              "description": "truy vấn trong admin_collection_cards"
             },
-            "permissions": {
-              "type": "array",
-              "items": { "type": "string" },
-              "description": "Danh sách quyền hành động (ví dụ: ['change_user_status'])"
-            },
-            "description": {
+            "admin_signature": {
               "type": "string",
-              "description": "Mô tả ngắn gọn về vai trò"
+              "description": "truy vấn trong admin_collection_cards"
+            },
+            "superadmin_signature": {
+              "type": "string",
+              "description": "truy vấn trong admin_collection_cards"
+            },
+            "admin_signed_at": {
+              "type": "date-time",
+              "description": "Thời gian admin ký"
+            },
+            "superadmin_signed_at": {
+              "type": "date-time",
+              "description": "Thời gian superadmin ký"
+            },
+            "rejected_reason": {
+              "type": "string",
+              "description": "Lý do bài test bị từ chối bởi admin hoặc superadmin"
+            },
+            "test_type": { "type": "string", "enum": ["listening", "reading"] },
+            "level": { "type": "string", "enum": ["B1", "B2", "C1"] },
+            "created_by": "string",
+            "created_at": "date-time",
+            "status": {
+              "type": "string",
+              "enum": ["draft", "pending_review", "rejected", "approved"],
+              "default": "draft",
+              "description": "Trạng thái của bài kiểm tra"
             }
           },
-          "required": ["_id", "role", "permissions"]
+          "allOf": [
+            {
+              "if": {
+                "properties": { "test_type": { "const": "listening" } }
+              },
+              "then": {
+                "properties": {
+                  "audio_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "URL của file audio. Trường này chứa URL của file audio, dù là từ upload hoặc nhập trực tiếp."
+                  },
+                  "questions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "question_id": { "type": "string" },
+                        "question_text": { "type": "string" },
+                        "options": {
+                          "type": "array",
+                          "items": { "type": "string" },
+                          "minItems": 4,
+                          "maxItems": 4
+                        },
+                        "correct_answer": { "type": "string" }
+                      },
+                      "required": [
+                        "question_id",
+                        "question_text",
+                        "options",
+                        "correct_answer",
+                        "audio_url"
+                      ]
+                    }
+                  }
+                },
+                "required": ["audio_url", "questions"]
+              }
+            },
+            {
+              "if": { "properties": { "test_type": { "const": "reading" } } },
+              "then": {
+                "properties": {
+                  "instructions": { "type": "string" },
+                  "passages": {
+                    "type": "array",
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "passage_id": { "type": "string" },
+                        "question_text": {
+                          "type": "string",
+                          "description": "Nội dung đoạn văn hoặc câu hỏi"
+                        },
+                        "questions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "question_id": { "type": "string" },
+                              "question_type": {
+                                "type": "string",
+                                "enum": ["multiple_choice", "short_answer"]
+                              },
+                              "text": { "type": "string" },
+                              "options": {
+                                "type": "array",
+                                "items": { "type": "string" },
+                                "minItems": 4,
+                                "maxItems": 4
+                              },
+                              "correct_answer": { "type": "string" }
+                            },
+                            "required": [
+                              "question_id",
+                              "question_type",
+                              "text",
+                              "correct_answer"
+                            ],
+                            "allOf": [
+                              {
+                                "if": {
+                                  "properties": {
+                                    "question_type": {
+                                      "const": "multiple_choice"
+                                    }
+                                  }
+                                },
+                                "then": {
+                                  "required": ["options", "correct_answer"]
+                                }
+                              },
+                              {
+                                "if": {
+                                  "properties": {
+                                    "question_type": {
+                                      "const": "short_answer"
+                                    }
+                                  }
+                                },
+                                "then": { "required": ["correct_answer"] }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": ["passage_id", "question_text", "questions"]
+                    }
+                  }
+                },
+                "required": ["level", "instructions", "passages"]
+              }
+            }
+          ],
+          "additionalProperties": false
         },
         "jsonSample": [
           {
-            "_id": "ROLE_ADMIN",
-            "role": "admin",
-            "permissions": ["change_user_status", "create_card", "delete_user"],
-            "description": "Quyền quản lý người dùng và thẻ"
+            "_id": "DRAFT_001",
+            "test_id": "TEST_123456",
+            "admin_card_id": "AC123456789",
+            "admin_signature": "base64-encoded-signature",
+            "test_type": "listening",
+            "level": "B2",
+            "created_by": "ADMIN-1a2b3c4d5e6f7890",
+            "created_at": "2025-02-14T18:26:02.588Z",
+            "status": "draft",
+            "audio_url": "https://example.com/audio.mp3",
+            "questions": [
+              {
+                "question_id": "Q1",
+                "question_text": "What is the main idea of the audio?",
+                "options": ["Option A", "Option B", "Option C", "Option D"],
+                "correct_answer": "Option A"
+              }
+            ]
           },
           {
-            "_id": "ROLE_SUPPORT",
-            "role": "support",
-            "permissions": ["change_user_status"],
-            "description": "Chỉ có quyền thay đổi trạng thái người dùng"
+            "_id": "DRAFT_002",
+            "test_id": "TEST_654321",
+            "admin_card_id": "AC987654321",
+            "admin_signature": "base64-encoded-signature",
+            "test_type": "reading",
+            "level": "C1",
+            "created_by": "ADMIN-0a1b2c3d4e5f6789",
+            "created_at": "2025-02-14T18:26:02.588Z",
+            "status": "draft",
+            "instructions": "Read the following passages and answer the questions.",
+            "passages": [
+              {
+                "passage_id": "P1",
+                "question_text": "Passage 1 content here.",
+                "questions": [
+                  {
+                    "question_id": "Q1",
+                    "question_type": "multiple_choice",
+                    "text": "What is the main point of this passage?",
+                    "options": ["A", "B", "C", "D"],
+                    "correct_answer": "A"
+                  },
+                  {
+                    "question_id": "Q2",
+                    "question_type": "short_answer",
+                    "text": "Explain the significance of the passage.",
+                    "correct_answer": "Significance explanation here."
+                  }
+                ]
+              }
+            ]
           }
         ]
       }
@@ -289,17 +436,698 @@
           {
             "pipeline": [
               {
+                "$match": {
+                  "admin_card_id": { "$exists": true },
+                  "test_type": { "$in": ["listening", "reading"] }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "admin_collection_cards",
+                  "localField": "admin_card_id",
+                  "foreignField": "card_id",
+                  "as": "admin_card_data"
+                }
+              },
+              {
+                "$unwind": "$admin_card_data"
+              },
+              {
+                "$addFields": {
+                  "is_admin_verified": {
+                    "$cond": {
+                      "if": { "$eq": ["$admin_card_data.status", "active"] },
+                      "then": true,
+                      "else": false
+                    }
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "is_admin_verified": true
+                }
+              },
+              {
+                "$addFields": {
+                  "audio_processed": {
+                    "$cond": {
+                      "if": { "$ne": ["$audio_file", null] },
+                      "then": {
+                        "$function": {
+                          "body": "function(audioFile) { const crypto = require('crypto'); const hash = crypto.createHash('sha256'); hash.update(audioFile); return hash.digest('hex'); }",
+                          "args": ["$audio_file"],
+                          "lang": "js"
+                        }
+                      },
+                      "else": "$audio_url"
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "final_audio_url": {
+                    "$cond": {
+                      "if": { "$ne": ["$audio_file", null] },
+                      "then": "$audio_processed",
+                      "else": "$audio_url"
+                    }
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "admin_signature": { "$exists": true }
+                }
+              },
+              {
+                "$addFields": {
+                  "signature_verified": {
+                    "$function": {
+                      "body": "function(signature, publicKey) { const crypto = require('crypto'); const verify = crypto.createVerify('SHA256'); verify.update(JSON.stringify({ test_id: this.test_id, final_audio_url: this.final_audio_url })); verify.end(); return verify.verify(publicKey, signature, 'base64'); }",
+                      "args": [
+                        "$admin_signature",
+                        "$admin_card_data.public_key"
+                      ],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "signature_verified": true
+                }
+              },
+              {
                 "$merge": {
-                  "into": "admin_roles",
+                  "into": "admin_draft_tests",
                   "on": "_id",
                   "whenMatched": "merge",
                   "whenNotMatched": "insert"
                 }
               }
             ],
-            "purpose": "Lưu trữ và quản lý các vai trò và quyền của admin",
-            "data_input_from_node": [],
-            "data_output_to_node": []
+            "purpose": "Xử lý và xác minh dữ liệu đề thi trước khi lưu vào cơ sở dữ liệu.",
+            "data_input_from_node": ["admin_collection_cards"],
+            "data_output_to_node": ["admin_draft_tests"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "status": "pending_review",
+                  "test_id": { "$exists": true }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "admin_collection_cards",
+                  "localField": "superadmin_card_id",
+                  "foreignField": "card_id",
+                  "as": "superadmin_card_data"
+                }
+              },
+              { "$unwind": "$superadmin_card_data" },
+              {
+                "$addFields": {
+                  "is_superadmin_verified": {
+                    "$cond": {
+                      "if": {
+                        "$eq": ["$superadmin_card_data.status", "active"]
+                      },
+                      "then": true,
+                      "else": false
+                    }
+                  }
+                }
+              },
+              { "$match": { "is_superadmin_verified": true } },
+              {
+                "$set": {
+                  "status": "approved",
+                  "superadmin_signature": "$superadmin_card_data.signature",
+                  "superadmin_signed_at": { "$toDate": "$$NOW" }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "admin_draft_tests",
+                  "on": "_id",
+                  "whenMatched": "merge"
+                }
+              },
+              {
+                "$project": {
+                  "_id": "$test_id",
+                  "test_type": 1,
+                  "level": 1,
+                  "audio_url": 1,
+                  "questions": 1,
+                  "instructions": 1,
+                  "passages": 1,
+                  "admin_signature": 1,
+                  "admin_signed_at": 1,
+                  "superadmin_signature": 1,
+                  "superadmin_signed_at": 1
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_tests",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Superadmin kiểm duyệt lần 2 và duyệt đề thi chính thức.",
+            "data_input_from_node": ["admin_draft_tests"],
+            "data_output_to_node": ["collection_tests"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "status": "pending_review",
+                  "test_id": { "$exists": true }
+                }
+              },
+              {
+                "$set": {
+                  "status": "rejected",
+                  "rejected_by": "superadmin-id",
+                  "rejected_at": { "$toDate": "$$NOW" },
+                  "rejected_reason": "{{rejected_reason}}",
+                  "superadmin_signature": "{{superadmin_signature}}",
+                  "superadmin_signed_at": "{{superadmin_signed_at}}"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "admin_draft_tests",
+                  "on": "_id",
+                  "whenMatched": "merge"
+                }
+              }
+            ],
+            "purpose": "Superadmin từ chối đề thi chưa đạt chuẩn và giữ lại để admin chỉnh sửa.",
+            "data_input_from_node": ["admin_draft_tests"],
+            "data_output_to_node": ["admin_draft_tests"]
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+
+  {
+    "_id": "admin_draft_practice_materials",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "_id": "string",
+          "practice_id": "string",
+          "admin_card_id": {
+            "type": "string",
+            "unique": true,
+            "description": "Tham chiếu đến thẻ admin trong `admin_collection_cards`"
+          },
+          "admin_signature": {
+            "type": "string",
+            "description": "Chữ ký số của admin xác thực bài kiểm tra"
+          },
+          "test_type": { "type": "string", "enum": ["listening", "reading"] },
+          "level": { "type": "string", "enum": ["B1", "B2", "C1"] },
+          "created_by": "string",
+          "created_at": "date-time",
+          "status": {
+            "type": "string",
+            "enum": ["draft", "pending_review", "rejected"],
+            "description": "Trạng thái của tài liệu thực hành"
+          },
+          "listening": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "properties": {
+                "part": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3
+                },
+                "audio_url": {
+                  "type": "string",
+                  "description": "Either a Base64-encoded audio file or a URL pointing to an audio file.",
+                  "oneOf": [{ "format": "base64" }, { "format": "uri" }]
+                },
+                "questions": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 15,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "question_id": { "type": "string" },
+                      "question_text": { "type": "string" },
+                      "options": {
+                        "type": "array",
+                        "minItems": 3,
+                        "maxItems": 5,
+                        "items": { "type": "string" }
+                      },
+                      "correct_answer": { "type": "string" }
+                    },
+                    "required": [
+                      "question_id",
+                      "question_text",
+                      "options",
+                      "correct_answer"
+                    ]
+                  }
+                }
+              },
+              "required": ["part", "audio_url", "questions"]
+            }
+          },
+          "reading": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "properties": {
+                "part": { "type": "integer", "minimum": 1, "maximum": 4 },
+                "passage_id": { "type": "string" },
+                "text": { "type": "string" },
+                "questions": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 15,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "question_id": { "type": "string" },
+                      "question_text": { "type": "string" },
+                      "options": {
+                        "type": "array",
+                        "minItems": 3,
+                        "maxItems": 5,
+                        "items": { "type": "string" }
+                      },
+                      "correct_answer": { "type": "string" }
+                    },
+                    "required": [
+                      "question_id",
+                      "question_text",
+                      "options",
+                      "correct_answer"
+                    ]
+                  }
+                }
+              },
+              "required": ["part", "passage_id", "text", "questions"]
+            }
+          },
+          "writing": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "properties": {
+                "part": { "type": "integer", "minimum": 1, "maximum": 2 },
+                "prompt": { "type": "string" },
+                "sample_answer": { "type": "string" }
+              },
+              "required": ["part", "prompt", "sample_answer"]
+            }
+          },
+          "speaking": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "properties": {
+                "part": { "type": "integer", "minimum": 1, "maximum": 3 },
+                "prompt": { "type": "string" },
+                "sample_answer": { "type": "string" }
+              },
+              "required": ["part", "prompt", "sample_answer"]
+            }
+          }
+        },
+        "jsonSample": [
+          {
+            "_id": "DRAFT_PRACTICE_001",
+            "practice_id": "PRACTICE_123456",
+            "admin_card_id": "AC123456789",
+            "admin_signature": "base64-encoded-signature",
+            "test_type": "listening",
+            "level": "B2",
+            "created_by": "ADMIN-1a2b3c4d5e6f7890",
+            "created_at": "2025-02-14T18:26:02.588Z",
+            "status": "draft",
+            "listening": [
+              {
+                "part": 1,
+                "audio_url": "https://example.com/audio.mp3",
+                "questions": [
+                  {
+                    "question_id": "Q1",
+                    "question_text": "What is the main idea of the audio?",
+                    "options": ["Option A", "Option B", "Option C", "Option D"],
+                    "correct_answer": "Option A"
+                  }
+                ]
+              }
+            ],
+            "reading": [
+              {
+                "part": 1,
+                "passage_id": "P1",
+                "text": "Passage content here.",
+                "questions": [
+                  {
+                    "question_id": "Q1",
+                    "question_text": "What is the main point of this passage?",
+                    "options": ["A", "B", "C", "D"],
+                    "correct_answer": "A"
+                  }
+                ]
+              }
+            ],
+            "writing": [
+              {
+                "part": 1,
+                "prompt": "Write an essay about the importance of education.",
+                "sample_answer": "Education is crucial for personal and societal development."
+              },
+              {
+                "part": 2,
+                "prompt": "Describe your favorite book and its impact on you.",
+                "sample_answer": "My favorite book is '1984' by George Orwell, which opened my eyes to the dangers of totalitarianism."
+              },
+              {
+                "part": 3,
+                "prompt": "Discuss the role of technology in modern education.",
+                "sample_answer": "Technology has revolutionized education by providing access to vast resources and enabling online learning."
+              }
+            ],
+            "speaking": [
+              {
+                "part": 1,
+                "prompt": "Describe a memorable event in your life.",
+                "sample_answer": "One of the most memorable events in my life was my graduation day, which marked the culmination of years of hard work."
+              },
+              {
+                "part": 2,
+                "prompt": "Discuss your favorite hobby and why you enjoy it.",
+                "sample_answer": "My favorite hobby is painting, as it allows me to express my creativity and relax."
+              },
+              {
+                "part": 3,
+                "prompt": "Explain the importance of learning a second language.",
+                "sample_answer": "Learning a second language opens up new opportunities for communication and understanding different cultures."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "admin_card_id": { "$exists": true }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "admin_collection_cards",
+                  "localField": "admin_card_id",
+                  "foreignField": "card_id",
+                  "as": "admin_card_data"
+                }
+              },
+              {
+                "$unwind": "$admin_card_data"
+              },
+              {
+                "$match": {
+                  "admin_card_data.status": "active"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "admin_draft_practice_materials",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Kiểm tra quyền admin thông qua admin_card_id và xác minh trạng thái thẻ.",
+            "data_input_from_node": ["admin_collection_cards"],
+            "data_output_to_node": ["admin_draft_practice_materials"]
+          },
+          {
+            "pipeline": [
+              {
+                "$addFields": {
+                  "processed_audio_url": {
+                    "$cond": {
+                      "if": {
+                        "$regexMatch": {
+                          "input": "$audio_url",
+                          "regex": "^https?://.*$"
+                        }
+                      },
+                      "then": "$audio_url",
+                      "else": {
+                        "$function": {
+                          "body": "function(audioFile) { const crypto = require('crypto'); const hash = crypto.createHash('sha256'); hash.update(audioFile); return hash.digest('hex'); }",
+                          "args": ["$audio_url"],
+                          "lang": "js"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "admin_draft_practice_materials",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Xử lý URL hoặc băm file audio trước khi lưu vào cơ sở dữ liệu.",
+            "data_input_from_node": ["audio_url"],
+            "data_output_to_node": ["admin_draft_practice_materials"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "status": "pending_review",
+                  "admin_signature": { "$exists": false }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "admin_collection_cards",
+                  "localField": "admin_card_id",
+                  "foreignField": "card_id",
+                  "as": "admin_card_data"
+                }
+              },
+              {
+                "$unwind": "$admin_card_data"
+              },
+              {
+                "$match": {
+                  "admin_card_data.status": "active"
+                }
+              },
+              {
+                "$addFields": {
+                  "requires_signature": true
+                }
+              },
+              {
+                "$merge": {
+                  "into": "admin_draft_practice_materials",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Yêu cầu chữ ký số từ admin sau khi đề thi đã hoàn thành.",
+            "data_input_from_node": ["admin_collection_cards"],
+            "data_output_to_node": ["admin_draft_practice_materials"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "status": "pending_review",
+                  "admin_signature": { "$exists": true }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "admin_collection_cards",
+                  "localField": "admin_card_id",
+                  "foreignField": "card_id",
+                  "as": "admin_card_data"
+                }
+              },
+              {
+                "$unwind": "$admin_card_data"
+              },
+              {
+                "$match": {
+                  "admin_card_data.status": "active"
+                }
+              },
+              {
+                "$set": {
+                  "status": "completed"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "admin_draft_practice_materials",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Lưu dữ liệu vào cơ sở dữ liệu sau khi admin cung cấp chữ ký số và xác minh quyền admin.",
+            "data_input_from_node": ["admin_collection_cards"],
+            "data_output_to_node": ["admin_draft_practice_materials"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "status": "pending_review",
+                  "test_id": { "$exists": true }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "admin_collection_cards",
+                  "localField": "superadmin_card_id",
+                  "foreignField": "card_id",
+                  "as": "superadmin_card_data"
+                }
+              },
+              { "$unwind": "$superadmin_card_data" },
+              {
+                "$addFields": {
+                  "is_superadmin_verified": {
+                    "$cond": {
+                      "if": {
+                        "$eq": ["$superadmin_card_data.status", "active"]
+                      },
+                      "then": true,
+                      "else": false
+                    }
+                  }
+                }
+              },
+              { "$match": { "is_superadmin_verified": true } },
+              {
+                "$set": {
+                  "status": "approved",
+                  "superadmin_signature": "$superadmin_card_data.signature",
+                  "superadmin_signed_at": { "$toDate": "$$NOW" }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "admin_draft_tests",
+                  "on": "_id",
+                  "whenMatched": "merge"
+                }
+              },
+              {
+                "$project": {
+                  "_id": "$test_id",
+                  "test_type": 1,
+                  "level": 1,
+                  "upload_date": 1,
+                  "listening": 1,
+                  "writing": 1,
+                  "speaking": 1,
+                  "admin_signature": 1,
+                  "admin_signed_at": 1,
+                  "superadmin_signature": 1,
+                  "superadmin_signed_at": 1
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_tests",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Superadmin kiểm duyệt lần 2 và duyệt đề thi chính thức.",
+            "data_input_from_node": ["admin_draft_tests"],
+            "data_output_to_node": ["collection_tests"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "status": "pending_review",
+                  "test_id": { "$exists": true }
+                }
+              },
+              {
+                "$set": {
+                  "status": "rejected",
+                  "rejected_by": "superadmin-id",
+                  "rejected_at": { "$toDate": "$$NOW" },
+                  "rejected_reason": "{{rejected_reason}}",
+                  "superadmin_signature": "{{superadmin_signature}}",
+                  "superadmin_signed_at": "{{superadmin_signed_at}}"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "admin_draft_tests",
+                  "on": "_id",
+                  "whenMatched": "merge"
+                }
+              }
+            ],
+            "purpose": "Superadmin từ chối đề thi chưa đạt chuẩn và giữ lại để admin chỉnh sửa.",
+            "data_input_from_node": ["admin_draft_tests"],
+            "data_output_to_node": ["admin_draft_tests"]
           }
         ]
       }
@@ -478,10 +1306,7 @@
           "type": "object",
           "properties": {
             "_id": { "type": "string" },
-            "admin_id": {
-              "type": "string",
-              "description": "ID người dùng (ADMIN-UUID)"
-            },
+
             "admin_card_id": {
               "type": "string",
               "description": "Mã định danh duy nhất của thẻ dành cho admin (định dạng AC-<ECDSA>)"
