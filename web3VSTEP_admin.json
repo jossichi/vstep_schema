@@ -86,11 +86,18 @@
           {
             "pipeline": [
               {
+                "$setWindowFields": {
+                  "output": {
+                    "employee_input": "$$employee_id"
+                  }
+                }
+              },
+              {
                 "$addFields": {
-                  "admin_id": {
+                  "hashed_adminID": {
                     "$function": {
                       "body": "function() { const crypto = require('crypto'); const uuid = crypto.randomBytes(16).toString('hex'); return 'ADMIN-' + uuid; }",
-                      "args": [],
+                      "args": ["$employee_input"],
                       "lang": "js"
                     }
                   }
@@ -1412,6 +1419,195 @@
               "admin_signature"
             ],
             "data_output_to_node": ["token", "expires_at"]
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+  {
+    "_id": "admin_action_logs",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "LogData",
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "description": "ID duy nhất cho bản ghi log"
+            },
+            "action_id": {
+              "type": "string",
+              "description": "Mã định danh duy nhất cho hành động đã thực hiện"
+            },
+            "admin_id": {
+              "type": "string",
+              "description": "ID của admin thực hiện hành động (định dạng ADMIN-<UUID>)"
+            },
+            "admin_card_id": {
+              "type": "string",
+              "description": "Mã thẻ admin thực hiện hành động (định dạng AC-<ECDSA>)"
+            },
+            "action_type": {
+              "type": "string",
+              "description": "Loại hành động, ví dụ: create_user, delete_user, block_user"
+            },
+            "target_type": {
+              "type": "string",
+              "description": "Loại mục tiêu bị tác động, ví dụ: user, test, card"
+            },
+            "target_id": {
+              "type": "string",
+              "description": "ID của đối tượng bị tác động"
+            },
+            "description": {
+              "type": "string",
+              "description": "Mô tả chi tiết về hành động đã thực hiện"
+            },
+            "timestamp": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời gian diễn ra hành động"
+            },
+            "ip_address": {
+              "type": "string",
+              "description": "Địa chỉ IP từ nơi hành động được thực hiện"
+            },
+            "user_agent": {
+              "type": "string",
+              "description": "Thông tin trình duyệt và hệ điều hành của người dùng"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["success", "failed"],
+              "description": "Trạng thái của hành động: thành công hay thất bại"
+            }
+          },
+          "required": [
+            "_id",
+            "action_id",
+            "admin_id",
+            "admin_card_id",
+            "action_type",
+            "target_type",
+            "target_id",
+            "description",
+            "timestamp",
+            "status"
+          ]
+        },
+        "jsonSample": [
+          {
+            "_id": "LOG_001",
+            "action_id": "ACT_1234567890",
+            "admin_id": "ADMIN-1a2b3c4d5e6f7890",
+            "admin_card_id": "AC123456789",
+            "action_type": "create_user",
+            "target_type": "user",
+            "target_id": "USER123",
+            "description": "Tạo tài khoản người dùng mới thành công.",
+            "timestamp": "2025-04-05T10:00:00.000Z",
+            "ip_address": "192.168.1.1",
+            "user_agent": "Mozilla/5.0...",
+            "status": "success"
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$addFields": {
+                  "log_entry": {
+                    "action_id": {
+                      "$concat": ["ACTION-", { "$toString": "$$NOW" }]
+                    },
+                    "admin_id": "$admin_id",
+                    "admin_card_id": "$admin_card_id",
+                    "action_type": "create_user",
+                    "target_type": "user",
+                    "target_id": "$new_user_id",
+                    "description": "Admin đã tạo tài khoản người dùng mới.",
+                    "timestamp": "$$NOW",
+                    "ip_address": "$client_ip",
+                    "user_agent": "$user_agent",
+                    "status": "success"
+                  }
+                }
+              },
+              {
+                "$replaceRoot": {
+                  "newRoot": "$log_entry"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "admin_action_logs",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "  Ghi lại hành động của admin khi tạo người dùng mới.",
+            "data_input_from_node": [],
+            "data_output_to_node": ["admin_action_logs"]
+          },
+          {
+            "pipeline": [
+              {
+                "$setWindowFields": {
+                  "output": {
+                    "employee_input": "$$employee_id"
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "hashed_adminID": {
+                    "$function": {
+                      "body": "function() { const crypto = require('crypto'); const uuid = crypto.randomBytes(16).toString('hex'); return 'ADMIN-' + uuid; }",
+                      "args": ["$employee_input"],
+                      "lang": "js"
+                    }
+                  }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "admin_collection_cards",
+                  "localField": "hashed_adminID",
+                  "foreignField": "hashed_adminID",
+                  "as": "admin_info"
+                }
+              },
+              {
+                "$unwind": {
+                  "path": "$admin_info",
+                  "preserveNullAndEmptyArrays": false
+                }
+              },
+              {
+                "$replaceRoot": {
+                  "newRoot": "$admin_info"
+                }
+              }
+            ],
+            "purpose": " Lấy thông tin admin từ `admin_collection_cards` dựa trên `hashed_adminID`.",
+            "data_input_from_node": ["admin_collection_cards"],
+            "data_output_to_node": ["admin_action_logs"]
           }
         ]
       }
