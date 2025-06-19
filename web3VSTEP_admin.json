@@ -1620,5 +1620,1971 @@
         "year": "2025"
       }
     }
+  },
+    {
+    "_id": "collection_user_transactions",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "UserTransactionData",
+          "type": "object",
+          "properties": {
+            "_id": {
+              "type": "string",
+              "description": "ID duy nhất của giao dịch."
+            },
+            "user_id": {
+              "type": "string",
+              "unique": true,
+              "description": "ID người dùng thực hiện giao dịch."
+            },
+            "transaction_type": {
+              "type": "string",
+              "enum": ["deposit", "payment", "reward"],
+              "description": "Loại giao dịch: nạp tiền, thanh toán, hoặc thưởng."
+            },
+            "amount": {
+              "type": "integer",
+              "minimum": 10000,
+              "maximum": 1000000,
+              "description": "Số tiền liên quan đến giao dịch (đơn vị VND)."
+            },
+            "description": {
+              "type": "string",
+              "description": "Mô tả chi tiết về giao dịch."
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời gian giao dịch được tạo."
+            },
+            "card_id": {
+              "type": "string",
+              "unique": true,
+              "description": "ID thẻ xác minh người dùng."
+            },
+            "signature": {
+              "type": "string",
+              "description": "Chữ ký số được tạo bởi ví của người dùng."
+            },
+            "public_key": {
+              "type": "string",
+              "description": "Khóa công khai để xác thực chữ ký số."
+            },
+            "status": {
+              "type": "string",
+              "enum": ["pending", "completed", "failed", "refunded"],
+              "description": "Trạng thái của giao dịch."
+            }
+          },
+          "required": [
+            "_id",
+            "user_id",
+            "transaction_type",
+            "amount",
+            "description",
+            "created_at",
+            "status"
+          ],
+          "additionalProperties": false
+        },
+        "jsonSample": [
+          {
+            "_id": "txn_001",
+            "user_id": "user_123",
+            "transaction_type": "deposit",
+            "amount": 100000,
+            "description": "Nạp tiền vào ví.",
+            "created_at": "2025-02-14T18:26:02.588Z",
+            "card_id": "card_456",
+            "signature": "signature_789",
+            "public_key": "public_key_abc",
+            "status": "completed"
+          },
+          {
+            "_id": "txn_002",
+            "user_id": "user_456",
+            "transaction_type": "payment",
+            "amount": 50000,
+            "description": "Thanh toán phí dịch vụ.",
+            "created_at": "2025-02-14T18:27:15.345Z",
+            "card_id": "card_789",
+            "signature": "signature_def",
+            "public_key": "public_key_xyz",
+            "status": "pending"
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "card_id": { "$exists": true }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "card_id",
+                  "foreignField": "card_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$addFields": {
+                  "is_balance_sufficient": {
+                    "$gte": ["$card_data.balance", "$amount"]
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Kiểm tra số dư trong collection_cards.balance trước khi thanh toán.",
+            "data_input_from_node": ["collection_user_transactions"],
+            "data_output_to_node": ["collection_user_transactions"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_OTP": { "$exists": true },
+                  "user_id": { "$exists": true },
+                  "transaction_type": "payment",
+                  "status": "pending"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$addFields": {
+                  "is_OTP_valid": {
+                    "$eq": ["$user_OTP", "$card_data.user_OTP"]
+                  },
+                  "created_at": "$$NOW",
+                  "expiration_time": {
+                    "$dateAdd": {
+                      "startDate": "$$NOW",
+                      "unit": "second",
+                      "amount": 60
+                    }
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "is_OTP_valid": true,
+                  "status": "pending",
+                  "expiration_time": { "$gte": "$$NOW" }
+                }
+              },
+              {
+                "$set": {
+                  "signature": "$card_data.signature"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$addFields": {
+                  "is_signature_valid": {
+                    "$cond": {
+                      "if": { "$eq": ["$signature", "CLIENT_SIGNATURE"] },
+                      "then": true,
+                      "else": false
+                    }
+                  }
+                }
+              },
+              {
+                "$set": {
+                  "status": {
+                    "$cond": {
+                      "if": {
+                        "$and": [
+                          "$is_signature_valid",
+                          { "$lte": ["$$NOW", "$expiration_time"] }
+                        ]
+                      },
+                      "then": "completed",
+                      "else": "failed"
+                    }
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "fail"
+                }
+              }
+            ],
+            "purpose": "Xác thực OTP và chữ ký số của người dùng trước khi hoàn tất giao dịch.",
+            "data_input_from_node": ["collection_cards"],
+            "data_output_to_node": ["collection_user_transactions"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "transaction_type": "payment",
+                  "amount": 10000,
+                  "status": "pending",
+                  "steps.status": "pending"
+                }
+              },
+              {
+                "$unwind": "$steps"
+              },
+              {
+                "$match": {
+                  "steps.status": "pending"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "card_id",
+                  "foreignField": "card_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$set": {
+                  "is_balance_sufficient": {
+                    "$gte": [
+                      "$card_data.balance",
+                      { "$divide": ["$amount", 5] }
+                    ]
+                  }
+                }
+              },
+              {
+                "$match": {
+                  "is_balance_sufficient": true
+                }
+              },
+              {
+                "$set": {
+                  "card_data.balance": {
+                    "$subtract": [
+                      "$card_data.balance",
+                      { "$divide": ["$amount", 5] }
+                    ]
+                  },
+                  "steps.$[step].status": "completed",
+                  "steps.$[step].verified_at": "$$NOW"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "user_id",
+                  "foreignField": "user_id",
+                  "as": "user_materials"
+                }
+              },
+              {
+                "$unwind": "$user_materials"
+              },
+              {
+                "$set": {
+                  "user_materials.remaining_attempts": {
+                    "$add": ["$user_materials.remaining_attempts", 1]
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_cards",
+                  "on": "card_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_cards",
+                  "on": "user_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Xử lý từng bước trong chuỗi giao dịch blockchain-style, trừ tiền từ collection_cards.balance và tăng remaining_attempts.",
+            "data_input_from_node": ["collection_user_transactions"],
+            "data_output_to_node": [
+              "collection_cards",
+              "collection_user_transactions"
+            ]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "_id": "TRANSACTION_ID",
+                  "status": "pending"
+                }
+              },
+              {
+                "$addFields": {
+                  "is_signature_valid": {
+                    "$eq": ["$signature", "CLIENT_SIGNATURE"]
+                  },
+                  "is_within_time_limit": {
+                    "$lte": ["$$NOW", "$expiration_time"]
+                  }
+                }
+              },
+              {
+                "$set": {
+                  "status": {
+                    "$cond": {
+                      "if": {
+                        "$and": ["$is_signature_valid", "$is_within_time_limit"]
+                      },
+                      "then": "completed",
+                      "else": "failed"
+                    }
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "fail"
+                }
+              }
+            ],
+            "purpose": "Xác thực chữ ký số và thời gian giao dịch.",
+            "data_input_from_node": ["collection_user_transactions"],
+            "data_output_to_node": [
+              "collection_cards",
+              "collection_user_transactions"
+            ]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "remaining_attempts": { "$gt": 0 }
+                }
+              },
+              {
+                "$set": {
+                  "remaining_attempts": 2
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_cards",
+                  "on": "user_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Reset remaining_attempts về 2 nếu người dùng không sử dụng hết.",
+            "data_input_from_node": ["collection_cards"],
+            "data_output_to_node": ["collection_cards"]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "steps.status": "pending"
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "card_id",
+                  "foreignField": "card_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$set": {
+                  "card_data.balance": {
+                    "$add": [
+                      "$card_data.balance",
+                      {
+                        "$multiply": [
+                          { "$size": "$steps" },
+                          { "$divide": ["$amount", 5] }
+                        ]
+                      }
+                    ]
+                  },
+                  "steps.$[].status": "refunded"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_cards",
+                  "on": "card_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Hoàn tiền cho người dùng nếu block không hoàn thành.",
+            "data_input_from_node": ["collection_user_transactions"],
+            "data_output_to_node": [
+              "collection_cards",
+              "collection_user_transactions"
+            ]
+          },
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "user_id": { "$exists": true },
+                  "transaction_type": "payment",
+                  "status": "failed"
+                }
+              },
+
+              {
+                "$lookup": {
+                  "from": "collection_cards",
+                  "localField": "card_id",
+                  "foreignField": "_id",
+                  "as": "card_data"
+                }
+              },
+              {
+                "$unwind": "$card_data"
+              },
+              {
+                "$set": {
+                  "card_data.balance": {
+                    "$add": ["$card_data.balance", "$amount"]
+                  }
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_cards",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "fail"
+                }
+              },
+              {
+                "$set": {
+                  "status": "refunded"
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_user_transactions",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "fail"
+                }
+              }
+            ],
+            "purpose": "Hoàn tiền cho người dùng nếu giao dịch thanh toán thất bại.",
+            "data_input_from_node": ["collection_user_transactions"],
+            "data_output_to_node": [
+              "collection_cards",
+              "collection_user_transactions"
+            ]
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+
+  {
+    "_id": "web_product_cost",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "title": "WebProductCost",
+          "type": "object",
+          "properties": {
+            "_id": { "type": "string" },
+            "date": {
+              "type": "string",
+              "format": "date",
+              "description": "Thời gian ghi nhận chi phí, theo định dạng YYYY-MM"
+            },
+            "currency": {
+              "type": "string",
+              "description": "Đơn vị tiền tệ (VND, VND, v.v.)"
+            },
+            "total_monthly_cost": {
+              "type": "number",
+              "description": "Tổng chi phí theo tháng"
+            },
+            "notes": {
+              "type": "string",
+              "description": "Ghi chú thêm liên quan đến chi phí"
+            },
+            "items": {
+              "type": "array",
+              "description": "Danh sách các khoản chi tiết",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "description": "Tên khoản chi" },
+                  "type": {
+                    "type": "string",
+                    "enum": ["infrastructure", "third_party", "tool"],
+                    "description": "Loại khoản chi theo nhóm"
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "server",
+                      "hosting",
+                      "domain",
+                      "email",
+                      "database",
+                      "development",
+                      "analytics",
+                      "other"
+                    ],
+                    "description": "Phân loại chi phí chi tiết"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Mô tả khoản chi"
+                  },
+                  "amount": { "type": "number", "description": "Số tiền" },
+                  "currency": {
+                    "type": "string",
+                    "description": "Đơn vị tiền tệ"
+                  },
+                  "is_paid": {
+                    "type": "boolean",
+                    "description": "Đã thanh toán hay chưa"
+                  },
+                  "provider": {
+                    "type": "string",
+                    "description": "Nhà cung cấp dịch vụ"
+                  },
+                  "billing_cycle": {
+                    "type": "string",
+                    "enum": ["monthly", "yearly", "one-time", "free"],
+                    "description": "Chu kỳ thanh toán"
+                  }
+                },
+                "required": [
+                  "name",
+                  "type",
+                  "category",
+                  "description",
+                  "amount",
+                  "currency",
+                  "is_paid",
+                  "provider",
+                  "billing_cycle"
+                ]
+              }
+            }
+          },
+          "required": [
+            "_id",
+            "date",
+            "currency",
+            "total_monthly_cost",
+            "items"
+          ],
+          "additionalProperties": false
+        },
+        "jsonSample": [
+          {
+            "_id": "cost_2025_06",
+            "date": "2025-06",
+            "currency": "VND",
+            "total_monthly_cost": 0,
+            "notes": "Hiện tại đang dùng gói miễn phí nhiều dịch vụ, dự kiến sẽ phát sinh chi phí khi scale.",
+            "items": [
+              {
+                "name": "Server Backend - Render",
+                "type": "infrastructure",
+                "category": "server",
+                "description": "Chi phí cho instance backend chạy trên Render",
+                "amount": 0,
+                "currency": "VND",
+                "is_paid": false,
+                "provider": "Render",
+                "billing_cycle": "monthly"
+              },
+              {
+                "name": "Hosting Frontend - Netlify",
+                "type": "infrastructure",
+                "category": "hosting",
+                "description": "Chi phí hosting frontend trên Netlify",
+                "amount": 0,
+                "currency": "VND",
+                "is_paid": false,
+                "provider": "Netlify",
+                "billing_cycle": "monthly"
+              },
+
+              {
+                "name": "CI/CD Pipeline",
+                "type": "tool",
+                "category": "development",
+                "description": "Chi phí cho CI/CD trên GitHub Actions",
+                "amount": 0,
+                "currency": "VND",
+                "is_paid": false,
+                "provider": "GitHub",
+                "billing_cycle": "monthly"
+              },
+              {
+                "name": "Analytics Tools",
+                "type": "tool",
+                "category": "analytics",
+                "description": "Sử dụng Google Analytics / Mixpanel",
+                "amount": 0,
+                "currency": "VND",
+                "is_paid": false,
+                "provider": "Google",
+                "billing_cycle": "free"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$setWindowFields": {
+                  "partitionBy": null,
+                  "sortBy": "_id",
+                  "output": {
+                    "current_date": {
+                      "$documentNumber": {}
+                    }
+                  }
+                }
+              },
+              {
+                "$unwind": {
+                  "path": "$items"
+                }
+              },
+              {
+                "$addFields": {
+                  "items.monthly_amount": {
+                    "$cond": [
+                      { "$eq": ["$items.billing_cycle", "monthly"] },
+                      "$items.amount",
+                      {
+                        "$cond": [
+                          { "$eq": ["$items.billing_cycle", "yearly"] },
+                          { "$divide": ["$items.amount", 12] },
+                          {
+                            "$cond": [
+                              { "$eq": ["$items.billing_cycle", "one-time"] },
+                              0,
+                              {
+                                "$cond": [
+                                  { "$eq": ["$items.billing_cycle", "free"] },
+                                  0,
+                                  0
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "$group": {
+                  "_id": "$_id",
+                  "date": { "$first": "$date" },
+                  "currency": { "$first": "$currency" },
+                  "notes": { "$first": "$notes" },
+                  "items": {
+                    "$push": "$items"
+                  },
+                  "total_monthly_cost": {
+                    "$sum": "$items.monthly_amount"
+                  }
+                }
+              },
+              {
+                "$project": {
+                  "items.monthly_amount": 0,
+                  "items._id": 0
+                }
+              }
+            ],
+            "purpose": ""
+          }
+        ]
+      }
+    }
+  },
+
+  {
+    "_id": "refundlogs",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "required": [
+            "_id",
+            "__v",
+            "completed_steps",
+            "failed_steps",
+            "processed_at",
+            "refunded_amount",
+            "transaction_id",
+            "user_id"
+          ],
+          "properties": {
+            "_id": {
+              "$ref": "#/$defs/ObjectId"
+            },
+            "__v": {
+              "type": "integer"
+            },
+            "completed_steps": {
+              "type": "integer"
+            },
+            "failed_steps": {
+              "type": "integer"
+            },
+            "processed_at": {
+              "$ref": "#/$defs/Date"
+            },
+            "refunded_amount": {
+              "type": "integer"
+            },
+            "transaction_id": {
+              "$ref": "#/$defs/ObjectId"
+            },
+            "user_id": {
+              "type": "string"
+            }
+          },
+          "$defs": {
+            "ObjectId": {
+              "type": "object",
+              "properties": {
+                "$oid": {
+                  "type": "string",
+                  "pattern": "^[0-9a-fA-F]{24}$"
+                }
+              },
+              "required": ["$oid"],
+              "additionalProperties": false
+            },
+            "Date": {
+              "type": "object",
+              "properties": {
+                "$date": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": ["$date"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "jsonSample": [
+          {
+            "_id": {
+              "$oid": "685026e46a6ce52a0129db19"
+            },
+            "transaction_id": {
+              "$oid": "68463c3a17026cbed8859013"
+            },
+            "user_id": "78759033-a6ea-4c35-95df-959d4fde77f9",
+            "refunded_amount": 9500,
+            "failed_steps": 5,
+            "completed_steps": 0,
+            "processed_at": {
+              "$date": "2025-06-16T14:15:00.494Z"
+            },
+            "__v": 0
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+
+  {
+    "_id": "collection_system_revenue",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "type": "object",
+          "required": [
+            "_id",
+            "admin_share_gross",
+            "date",
+            "share_breakdown",
+            "share_total_check",
+            "system_share_gross",
+            "total_amount",
+            "total_refunded"
+          ],
+          "properties": {
+            "_id": {
+              "$ref": "#/$defs/ObjectId"
+            },
+            "admin_share_gross": {
+              "$ref": "#/$defs/Double"
+            },
+            "date": {
+              "type": "string"
+            },
+            "share_breakdown": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "gross",
+                  "net_income",
+                  "role",
+                  "tax",
+                  "taxable_income"
+                ],
+                "properties": {
+                  "gross": {
+                    "$ref": "#/$defs/Double"
+                  },
+                  "net_income": {
+                    "$ref": "#/$defs/Double"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "tax": {
+                    "type": "integer"
+                  },
+                  "taxable_income": {
+                    "type": "integer"
+                  }
+                }
+              }
+            },
+            "share_total_check": {
+              "$ref": "#/$defs/Double"
+            },
+            "system_share_gross": {
+              "$ref": "#/$defs/Double"
+            },
+            "total_amount": {
+              "type": "integer"
+            },
+            "total_refunded": {
+              "type": "integer"
+            }
+          },
+          "$defs": {
+            "ObjectId": {
+              "type": "object",
+              "properties": {
+                "$oid": {
+                  "type": "string",
+                  "pattern": "^[0-9a-fA-F]{24}$"
+                }
+              },
+              "required": ["$oid"],
+              "additionalProperties": false
+            },
+            "Double": {
+              "oneOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "$numberDouble": {
+                      "enum": ["Infinity", "-Infinity", "NaN"]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "jsonSample": [
+          {
+            "_id": {
+              "$oid": "68504d545905e5e620fbbc8f"
+            },
+            "total_amount": 20000,
+            "date": "2025-06-16",
+            "total_refunded": 30400,
+            "system_share_gross": -12400,
+            "admin_share_gross": 2000,
+            "share_breakdown": [
+              {
+                "role": "superadmin",
+                "gross": 412,
+                "taxable_income": 0,
+                "tax": 0,
+                "net_income": 412
+              },
+              {
+                "role": "supervisor",
+                "gross": 412,
+                "taxable_income": 0,
+                "tax": 0,
+                "net_income": 412
+              },
+              {
+                "role": "admin",
+                "gross": 392,
+                "taxable_income": 0,
+                "tax": 0,
+                "net_income": 392
+              },
+              {
+                "role": "inspector_1",
+                "gross": 392,
+                "taxable_income": 0,
+                "tax": 0,
+                "net_income": 392
+              },
+              {
+                "role": "inspector_2",
+                "gross": 392,
+                "taxable_income": 0,
+                "tax": 0,
+                "net_income": 392
+              }
+            ],
+            "share_total_check": 2000
+          }
+        ]
+      }
+    },
+    "private": {
+      "node_function": {
+        "edge": [
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "transaction_type": "payment",
+                  "status": "completed",
+                  "created_at": {
+                    "$exists": true
+                  }
+                }
+              },
+
+              {
+                "$addFields": {
+                  "created_date": {
+                    "$dateToString": {
+                      "format": "%Y-%m-%d",
+                      "date": {
+                        "$toDate": "$created_at"
+                      },
+                      "timezone": "Asia/Ho_Chi_Minh"
+                    }
+                  }
+                }
+              },
+
+              {
+                "$group": {
+                  "_id": "$created_date",
+                  "total_amount": {
+                    "$sum": "$amount"
+                  }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "refundlogs",
+                  "let": {
+                    "dateStr": "$_id"
+                  },
+                  "pipeline": [
+                    {
+                      "$addFields": {
+                        "processed_date": {
+                          "$dateToParts": {
+                            "date": "$processed_at",
+                            "timezone": "Asia/Ho_Chi_Minh"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$addFields": {
+                        "processed_date_str": {
+                          "$concat": [
+                            {
+                              "$toString": "$processed_date.year"
+                            },
+                            "-",
+                            {
+                              "$cond": [
+                                {
+                                  "$lt": ["$processed_date.month", 10]
+                                },
+                                {
+                                  "$concat": [
+                                    "0",
+                                    {
+                                      "$toString": "$processed_date.month"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "$toString": "$processed_date.month"
+                                }
+                              ]
+                            },
+                            "-",
+                            {
+                              "$cond": [
+                                {
+                                  "$lt": ["$processed_date.day", 10]
+                                },
+                                {
+                                  "$concat": [
+                                    "0",
+                                    {
+                                      "$toString": "$processed_date.day"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "$toString": "$processed_date.day"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "$match": {
+                        "$expr": {
+                          "$eq": ["$processed_date_str", "$$dateStr"]
+                        }
+                      }
+                    }
+                  ],
+                  "as": "refund_logs"
+                }
+              },
+
+              {
+                "$addFields": {
+                  "date": "$_id",
+                  "total_refunded": {
+                    "$sum": "$refund_logs.refunded_amount"
+                  },
+                  "system_share_gross": {
+                    "$subtract": [
+                      {
+                        "$multiply": ["$total_amount", 0.9]
+                      },
+                      {
+                        "$ifNull": [
+                          {
+                            "$sum": "$refund_logs.refunded_amount"
+                          },
+                          0
+                        ]
+                      }
+                    ]
+                  },
+                  "admin_share_gross": {
+                    "$multiply": ["$total_amount", 0.1]
+                  },
+                  "role_share_unit": {
+                    "$divide": [
+                      {
+                        "$multiply": ["$total_amount", 0.1]
+                      },
+                      5.1
+                    ]
+                  }
+                }
+              },
+
+              {
+                "$addFields": {
+                  "share_breakdown": [
+                    {
+                      "role": "superadmin",
+                      "gross": {
+                        "$round": [
+                          {
+                            "$multiply": ["$role_share_unit", 1.05]
+                          },
+                          0
+                        ]
+                      }
+                    },
+                    {
+                      "role": "supervisor",
+                      "gross": {
+                        "$round": [
+                          {
+                            "$multiply": ["$role_share_unit", 1.05]
+                          },
+                          0
+                        ]
+                      }
+                    },
+                    {
+                      "role": "admin",
+                      "gross": {
+                        "$round": ["$role_share_unit", 0]
+                      }
+                    },
+                    {
+                      "role": "inspector_1",
+                      "gross": {
+                        "$round": ["$role_share_unit", 0]
+                      }
+                    },
+                    {
+                      "role": "inspector_2",
+                      "gross": {
+                        "$subtract": [
+                          "$admin_share_gross",
+                          {
+                            "$sum": [
+                              {
+                                "$round": [
+                                  {
+                                    "$multiply": ["$role_share_unit", 1.05]
+                                  },
+                                  0
+                                ]
+                              },
+                              {
+                                "$round": [
+                                  {
+                                    "$multiply": ["$role_share_unit", 1.05]
+                                  },
+                                  0
+                                ]
+                              },
+                              {
+                                "$round": ["$role_share_unit", 0]
+                              },
+                              {
+                                "$round": ["$role_share_unit", 0]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+
+              {
+                "$addFields": {
+                  "share_breakdown": {
+                    "$map": {
+                      "input": "$share_breakdown",
+                      "as": "s",
+                      "in": {
+                        "$let": {
+                          "vars": {
+                            "v_gross": "$$s.gross",
+                            "v_taxable": {
+                              "$max": [
+                                0,
+                                {
+                                  "$subtract": ["$$s.gross", 11000000]
+                                }
+                              ]
+                            }
+                          },
+                          "in": {
+                            "$let": {
+                              "vars": {
+                                "v_tax": {
+                                  "$switch": {
+                                    "branches": [
+                                      {
+                                        "case": {
+                                          "$lte": ["$$v_taxable", 0]
+                                        },
+                                        "then": 0
+                                      },
+                                      {
+                                        "case": {
+                                          "$lte": ["$$v_taxable", 5000000]
+                                        },
+                                        "then": {
+                                          "$round": [
+                                            {
+                                              "$multiply": ["$$v_taxable", 0.05]
+                                            },
+                                            0
+                                          ]
+                                        }
+                                      },
+                                      {
+                                        "case": {
+                                          "$lte": ["$$v_taxable", 10000000]
+                                        },
+                                        "then": {
+                                          "$round": [
+                                            {
+                                              "$subtract": [
+                                                {
+                                                  "$multiply": [
+                                                    "$$v_taxable",
+                                                    0.1
+                                                  ]
+                                                },
+                                                250000
+                                              ]
+                                            },
+                                            0
+                                          ]
+                                        }
+                                      },
+                                      {
+                                        "case": {
+                                          "$lte": ["$$v_taxable", 18000000]
+                                        },
+                                        "then": {
+                                          "$round": [
+                                            {
+                                              "$subtract": [
+                                                {
+                                                  "$multiply": [
+                                                    "$$v_taxable",
+                                                    0.15
+                                                  ]
+                                                },
+                                                750000
+                                              ]
+                                            },
+                                            0
+                                          ]
+                                        }
+                                      },
+                                      {
+                                        "case": {
+                                          "$lte": ["$$v_taxable", 32000000]
+                                        },
+                                        "then": {
+                                          "$round": [
+                                            {
+                                              "$subtract": [
+                                                {
+                                                  "$multiply": [
+                                                    "$$v_taxable",
+                                                    0.2
+                                                  ]
+                                                },
+                                                1650000
+                                              ]
+                                            },
+                                            0
+                                          ]
+                                        }
+                                      },
+                                      {
+                                        "case": {
+                                          "$lte": ["$$v_taxable", 52000000]
+                                        },
+                                        "then": {
+                                          "$round": [
+                                            {
+                                              "$subtract": [
+                                                {
+                                                  "$multiply": [
+                                                    "$$v_taxable",
+                                                    0.25
+                                                  ]
+                                                },
+                                                3250000
+                                              ]
+                                            },
+                                            0
+                                          ]
+                                        }
+                                      },
+                                      {
+                                        "case": {
+                                          "$lte": ["$$v_taxable", 80000000]
+                                        },
+                                        "then": {
+                                          "$round": [
+                                            {
+                                              "$subtract": [
+                                                {
+                                                  "$multiply": [
+                                                    "$$v_taxable",
+                                                    0.3
+                                                  ]
+                                                },
+                                                5850000
+                                              ]
+                                            },
+                                            0
+                                          ]
+                                        }
+                                      }
+                                    ],
+                                    "default": {
+                                      "$round": [
+                                        {
+                                          "$subtract": [
+                                            {
+                                              "$multiply": ["$$v_taxable", 0.35]
+                                            },
+                                            9850000
+                                          ]
+                                        },
+                                        0
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+
+                              "in": {
+                                "role": "$$s.role",
+                                "gross": "$$v_gross",
+                                "taxable_income": "$$v_taxable",
+                                "tax": "$$v_tax",
+                                "net_income": {
+                                  "$subtract": ["$$v_gross", "$$v_tax"]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+
+              {
+                "$addFields": {
+                  "share_total_check": {
+                    "$sum": "$share_breakdown.gross"
+                  },
+                  "_id": {
+                    "$concat": [
+                      "revenue_",
+                      {
+                        "$replaceAll": {
+                          "input": "$_id",
+                          "find": "-",
+                          "replacement": "_"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+
+              {
+                "$project": {
+                  "_id": 1,
+                  "date": 1,
+                  "total_refunded": 1,
+                  "total_amount": 1,
+                  "system_share_gross": 1,
+                  "admin_share_gross": 1,
+                  "share_breakdown": 1,
+                  "share_total_check": 1
+                }
+              },
+
+              {
+                "$merge": {
+                  "into": "collection_system_revenue",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Tính toán doanh thu hệ thống từ các giao dịch thanh toán đã hoàn thành theo ngày.",
+            "data_input_from_node": ["collection_transactions", "refundlogs"],
+            "data_output_to_node": "collection_system_revenue"
+          },
+
+          {
+            "pipeline": [
+              {
+                "$match": {
+                  "transaction_type": "payment",
+                  "status": "completed",
+                  "created_at": {
+                    "$exists": true
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "created_date": {
+                    "$dateToString": {
+                      "format": "%Y-%m",
+                      "date": {
+                        "$toDate": "$created_at"
+                      },
+                      "timezone": "Asia/Ho_Chi_Minh"
+                    }
+                  }
+                }
+              },
+              {
+                "$group": {
+                  "_id": "$created_date",
+                  "total_amount": {
+                    "$sum": "$amount"
+                  },
+                  "transactions_list": {
+                    "$push": "$$ROOT"
+                  }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "refundlogs",
+                  "let": {
+                    "monthStr": "$_id"
+                  },
+                  "pipeline": [
+                    {
+                      "$addFields": {
+                        "processed_month": {
+                          "$dateToString": {
+                            "format": "%Y-%m",
+                            "date": "$processed_at",
+                            "timezone": "Asia/Ho_Chi_Minh"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$match": {
+                        "$expr": {
+                          "$eq": ["$processed_month", "$$monthStr"]
+                        }
+                      }
+                    },
+                    {
+                      "$group": {
+                        "_id": null,
+                        "total_refunded": {
+                          "$sum": "$refunded_amount"
+                        }
+                      }
+                    }
+                  ],
+                  "as": "total_refunded"
+                }
+              },
+              {
+                "$addFields": {
+                  "total_refunded": {
+                    "$cond": [
+                      {
+                        "$isArray": "$total_refunded"
+                      },
+                      {
+                        "$arrayElemAt": ["$total_refunded.total_refunded", 0]
+                      },
+                      0
+                    ]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "date": "$_id",
+                  "system_share_gross": {
+                    "$subtract": [
+                      {
+                        "$multiply": ["$total_amount", 0.9]
+                      },
+                      {
+                        "$ifNull": [
+                          {
+                            "$sum": "$refund_logs.refunded_amount"
+                          },
+                          0
+                        ]
+                      }
+                    ]
+                  },
+                  "admin_share_gross": {
+                    "$multiply": ["$total_amount", 0.1]
+                  },
+                  "role_share_unit": {
+                    "$divide": [
+                      {
+                        "$multiply": ["$total_amount", 0.1]
+                      },
+                      5.1
+                    ]
+                  },
+                  "generated_at": "$$NOW",
+                  "generated_by": {
+                    "$const": "system"
+                  },
+                  "report_period": {
+                    "$const": "monthly"
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "share_breakdown": [
+                    {
+                      "role": "superadmin",
+                      "gross": {
+                        "$round": [
+                          {
+                            "$multiply": ["$role_share_unit", 1.05]
+                          },
+                          0
+                        ]
+                      }
+                    },
+                    {
+                      "role": "supervisor",
+                      "gross": {
+                        "$round": [
+                          {
+                            "$multiply": ["$role_share_unit", 1.05]
+                          },
+                          0
+                        ]
+                      }
+                    },
+                    {
+                      "role": "admin",
+                      "gross": {
+                        "$round": ["$role_share_unit", 0]
+                      }
+                    },
+                    {
+                      "role": "inspector_1",
+                      "gross": {
+                        "$round": ["$role_share_unit", 0]
+                      }
+                    },
+                    {
+                      "role": "inspector_2",
+                      "gross": {
+                        "$subtract": [
+                          "$admin_share_gross",
+                          {
+                            "$sum": [
+                              {
+                                "$round": [
+                                  {
+                                    "$multiply": ["$role_share_unit", 1.05]
+                                  },
+                                  0
+                                ]
+                              },
+                              {
+                                "$round": [
+                                  {
+                                    "$multiply": ["$role_share_unit", 1.05]
+                                  },
+                                  0
+                                ]
+                              },
+                              {
+                                "$round": ["$role_share_unit", 0]
+                              },
+                              {
+                                "$round": ["$role_share_unit", 0]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "$addFields": {
+                  "share_breakdown": {
+                    "$map": {
+                      "input": "$share_breakdown",
+                      "as": "s",
+                      "in": {
+                        "$let": {
+                          "vars": {
+                            "v_gross": "$$s.gross",
+                            "v_taxable": {
+                              "$max": [
+                                0,
+                                {
+                                  "$subtract": ["$$s.gross", 11000000]
+                                }
+                              ]
+                            }
+                          },
+                          "in": {
+                            "$let": {
+                              "vars": {
+                                "v_tax": {
+                                  "$switch": {
+                                    "branches": [
+                                      {
+                                        "case": {
+                                          "$lte": ["$$v_taxable", 0]
+                                        },
+                                        "then": 0
+                                      },
+                                      {
+                                        "case": {
+                                          "$lte": ["$$v_taxable", 5000000]
+                                        },
+                                        "then": {
+                                          "$round": [
+                                            {
+                                              "$multiply": ["$$v_taxable", 0.05]
+                                            },
+                                            0
+                                          ]
+                                        }
+                                      },
+                                      {
+                                        "case": {
+                                          "$lte": ["$$v_taxable", 10000000]
+                                        },
+                                        "then": {
+                                          "$round": [
+                                            {
+                                              "$subtract": [
+                                                {
+                                                  "$multiply": [
+                                                    "$$v_taxable",
+                                                    0.1
+                                                  ]
+                                                },
+                                                250000
+                                              ]
+                                            },
+                                            0
+                                          ]
+                                        }
+                                      },
+                                      {
+                                        "case": {
+                                          "$lte": ["$$v_taxable", 18000000]
+                                        },
+                                        "then": {
+                                          "$round": [
+                                            {
+                                              "$subtract": [
+                                                {
+                                                  "$multiply": [
+                                                    "$$v_taxable",
+                                                    0.15
+                                                  ]
+                                                },
+                                                750000
+                                              ]
+                                            },
+                                            0
+                                          ]
+                                        }
+                                      },
+                                      {
+                                        "case": {
+                                          "$lte": ["$$v_taxable", 32000000]
+                                        },
+                                        "then": {
+                                          "$round": [
+                                            {
+                                              "$subtract": [
+                                                {
+                                                  "$multiply": [
+                                                    "$$v_taxable",
+                                                    0.2
+                                                  ]
+                                                },
+                                                1650000
+                                              ]
+                                            },
+                                            0
+                                          ]
+                                        }
+                                      },
+                                      {
+                                        "case": {
+                                          "$lte": ["$$v_taxable", 52000000]
+                                        },
+                                        "then": {
+                                          "$round": [
+                                            {
+                                              "$subtract": [
+                                                {
+                                                  "$multiply": [
+                                                    "$$v_taxable",
+                                                    0.25
+                                                  ]
+                                                },
+                                                3250000
+                                              ]
+                                            },
+                                            0
+                                          ]
+                                        }
+                                      },
+                                      {
+                                        "case": {
+                                          "$lte": ["$$v_taxable", 80000000]
+                                        },
+                                        "then": {
+                                          "$round": [
+                                            {
+                                              "$subtract": [
+                                                {
+                                                  "$multiply": [
+                                                    "$$v_taxable",
+                                                    0.3
+                                                  ]
+                                                },
+                                                5850000
+                                              ]
+                                            },
+                                            0
+                                          ]
+                                        }
+                                      }
+                                    ],
+                                    "default": {
+                                      "$round": [
+                                        {
+                                          "$subtract": [
+                                            {
+                                              "$multiply": ["$$v_taxable", 0.35]
+                                            },
+                                            9850000
+                                          ]
+                                        },
+                                        0
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              "in": {
+                                "role": "$$s.role",
+                                "gross": "$$v_gross",
+                                "taxable_income": "$$v_taxable",
+                                "tax": "$$v_tax",
+                                "net_income": {
+                                  "$subtract": ["$$v_gross", "$$v_tax"]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "share_total_check": {
+                    "$sum": "$share_breakdown.gross"
+                  }
+                }
+              },
+              {
+                "$lookup": {
+                  "from": "web_product_cost",
+                  "let": {
+                    "monthStr": "$_id"
+                  },
+                  "pipeline": [
+                    {
+                      "$match": {
+                        "$expr": {
+                          "$eq": ["$date", "$$monthStr"]
+                        }
+                      }
+                    }
+                  ],
+                  "as": "web_product_cost"
+                }
+              },
+              {
+                "$addFields": {
+                  "total_web_product_cost": {
+                    "$cond": [
+                      {
+                        "$isArray": "$web_product_cost"
+                      },
+                      {
+                        "$arrayElemAt": ["$web_product_cost.amount", 0]
+                      },
+                      0
+                    ]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "web_product_cost": {
+                    "$arrayElemAt": ["$web_product_cost", 0]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "gross_profit_system": {
+                    "$subtract": [
+                      "$system_share_gross",
+                      {
+                        "$ifNull": ["$web_product_cost.total_monthly_cost", 0]
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "$project": {
+                  "_id": 1,
+                  "date": 1,
+                  "total_refunded": 1,
+                  "total_amount": 1,
+                  "system_share_gross": 1,
+                  "admin_share_gross": 1,
+                  "share_breakdown": 1,
+                  "share_total_check": 1,
+                  "transactions_list": 1,
+                  "gross_profit_system": 1,
+                  "web_product_cost": 1,
+                  "generated_at": 1,
+                  "generated_by": 1,
+                  "report_period": 1
+                }
+              },
+              {
+                "$merge": {
+                  "into": "collection_system_revenue",
+                  "on": "_id",
+                  "whenMatched": "merge",
+                  "whenNotMatched": "insert"
+                }
+              }
+            ],
+            "purpose": "Tính toán doanh thu hệ thống theo tháng từ các giao dịch thanh toán đã hoàn thành.",
+            "data_input_from_node": "collection_transactions",
+            "data_output_to_node": "collection_system_revenue"
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
   }
 ]
