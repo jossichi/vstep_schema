@@ -1,5 +1,129 @@
 [
   {
+    "_id": "collection_cards",
+    "public": {
+      "node_data": {
+        "jsonSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "CardData",
+          "type": "object",
+          "properties": {
+            "_id": { "type": "string" },
+            "card_id": {
+              "type": "string",
+              "unique": true,
+              "description": "Mã định danh duy nhất của thẻ"
+            },
+            "user_id": {
+              "type": "string",
+              "unique": true,
+              "description": "ID người dùng sở hữu thẻ"
+            },
+            "public_key": {
+              "type": "string",
+              "description": "Khóa công khai để xác thực chữ ký số"
+            },
+            "token": { "type": "String", "required": true },
+            "qr_code": {
+              "type": "string",
+              "description": "Mã QR chứa thông tin xác thực (đã mã hóa)"
+            },
+            "signature": {
+              "type": "string",
+              "description": "Chữ ký số được tạo bởi ví của người dùng"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["active", "blocked"],
+              "description": "Trạng thái thẻ"
+            },
+            "balance": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "description": "Số dư hiện tại trên thẻ (đơn vị VND)."
+            },
+            "device_id": {
+              "type": "string",
+              "description": "ID của thiết bị sử dụng thẻ (nếu có).",
+              "nullable": true
+            },
+            "created_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Thời gian tạo thẻ"
+            },
+            "user_OTP": {
+              "bsonType": "string",
+              "pattern": "^[0-9]{6}$",
+              "description": "Mã OTP do người dùng nhập, phải là số có 6 chữ số."
+            },
+            "remaining_attempts": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 2,
+              "description": "Số lượt làm bài còn lại của người dùng."
+            },
+            "hashed_studentID": {
+              "type": "string",
+              "unique": true,
+              "description": "Giá trị băm của studentID"
+            }
+          },
+          "required": [
+            "_id",
+            "card_id",
+            "user_id",
+            "public_key",
+            "qr_code",
+            "token",
+            "status",
+            "created_at",
+            "hashed_studentID",
+            "remaining_attempts"
+          ]
+        },
+        "jsonSample": [
+          {
+            "_id": {
+              "$oid": "68162140a1a49d1aa33f3945"
+            },
+            "card_id": "65a8cf2c-7e2b-4875-b093-18b9086d0022",
+            "user_id": "0c4bcc1e-e03b-475e-b0a1-d6552601e0f4",
+            "public_key": "0x025fb526d7c5f9d5cb8f9d2730e2419bca3bb9e311ad4d0b57a0ad7e6f9074880a",
+            "qr_code": "data:image/png;base64,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",
+            "signature": "304502203e23df5682c703648779b56ae7223c7e45560499555b22a544ea90f2237a1697022100b1c8ccb285bf3b40bf960ea57804edbf1386f1b4fa401c24fffe52e526110c7d",
+            "status": "active",
+            "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMGM0YmNjMWUtZTAzYi00NzVlLWIwYTEtZDY1NTI2MDFlMGY0IiwiY2FyZF9pZCI6IjY1YThjZjJjLTdlMmItNDg3NS1iMDkzLTE4YjkwODZkMDAyMiIsImlhdCI6MTc0NjI4MDc2OCwiZXhwIjoxNzQ2ODg1NTY4fQ.tFc6WeRhmy40XHTJsJxZAho5PhezlYDOZMDSCpOYbg8",
+            "device_id": null,
+            "created_at": {
+              "$date": "2025-05-03T13:59:28.817Z"
+            },
+            "hashed_studentID": "15e2b0d3c33891ebb0f1ef609ec419420c20e320ce94c65fbc8c3312448eb225",
+            "createdAt": {
+              "$date": "2025-05-03T13:59:28.912Z"
+            },
+            "updatedAt": {
+              "$date": "2025-06-19T17:00:01.640Z"
+            },
+            "__v": 0,
+            "balance": 150000,
+            "remaining_attempts": 0,
+            "user_OTP": "104556"
+          }
+        ]
+      }
+    },
+    "personal": {
+      "node_info": {
+        "name": "English Test System",
+        "author": "Joshept",
+        "version": "1.0",
+        "year": "2025"
+      }
+    }
+  },
+  {
     "_id": "admin_collection_cards",
     "public": {
       "node_data": {
@@ -1621,7 +1745,7 @@
       }
     }
   },
-    {
+  {
     "_id": "collection_user_transactions",
     "public": {
       "node_data": {
