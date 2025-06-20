@@ -5124,11 +5124,16 @@
                   "from": "collection_elite_partner",
                   "localField": "user_id",
                   "foreignField": "user_id",
-                  "as": "leaderboard_data"
+                  "as": "collection_elite_partner"
                 }
               },
               {
-                "$unwind": "$leaderboard_data"
+                "$match": {
+                  "collection_elite_partner.is_elite_partner": true
+                }
+              },
+              {
+                "$unwind": "$collection_elite_partner"
               },
               {
                 "$addFields": {
