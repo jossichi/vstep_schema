@@ -1782,11 +1782,39 @@
             "visibility": {
               "type": "string",
               "enum": ["pending", "ready", "rejected"],
+              "default": "pending",
               "description": "The visibility status of the material: pending, ready, or rejected."
             },
             "signature": {
               "type": "string",
               "description": "Digital signature to verify authorship."
+            },
+            "approvals": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "approver_id": {
+                    "type": "string",
+                    "description": "ID của người xác nhận."
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": ["inspector", "supervisor", "admin"]
+                  },
+                  "signature": {
+                    "type": "string",
+                    "description": "Chữ ký xác nhận."
+                  },
+                  "approved_at": { "type": "string", "format": "date-time" }
+                },
+                "required": ["approver_id", "role", "signature", "approved_at"]
+              }
+            },
+            "rejection_reason": {
+              "type": "string",
+              "nullable": true,
+              "description": "Lý do từ chối nếu có."
             },
             "attempt_count": {
               "type": "integer",
@@ -2402,7 +2430,6 @@
       }
     }
   },
-
   {
     "_id": "collection_materials_user_done",
     "public": {
