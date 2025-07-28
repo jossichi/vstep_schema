@@ -5033,38 +5033,173 @@
           {
             "pipeline": [
               {
-                "$match": {
-                  "rank": { "$lte": 10 },
-                  "top10_history.time_in_top10": { "$gte": 14 }
-                }
-              },
-              {
                 "$lookup": {
                   "from": "collection_leaderboard",
                   "localField": "user_id",
                   "foreignField": "user_id",
-                  "as": "leaderboard_data"
+                  "as": "collection_leaderboard"
                 }
               },
               {
-                "$addFields": {
-                  "eligible_for_elite": {
-                    "$cond": {
-                      "if": {
-                        "$and": [
-                          { "$lte": ["$rank", 10] },
-                          { "$gte": ["$top10_history.time_in_top10", 14] }
-                        ]
-                      },
-                      "then": true,
-                      "else": false
+                "$match": {
+                  "$expr": {
+                    "$anyElementTrue": {
+                      "$map": {
+                        "input": "$collection_leaderboard",
+                        "as": "entry",
+                        "in": {
+                          "$lt": ["$$entry.rank", 10]
+                        }
+                      }
                     }
                   }
                 }
               },
               {
+                "$addFields": {
+                  "entered_top10_date": {
+                    "$cond": [
+                      {
+                        "$eq": [
+                          {
+                            "$type": "$top10_history.entered_top10_at"
+                          },
+                          "date"
+                        ]
+                      },
+                      "$top10_history.entered_top10_at",
+                      {
+                        "$dateFromString": {
+                          "dateString": "$top10_history.entered_top10_at",
+                          "format": "%Y-%m-%dT%H:%M:%S.%LZ"
+                        }
+                      }
+                    ]
+                  },
+                  "current_rank": "$leaderboard_data.rank"
+                }
+              },
+              {
+                "$addFields": {
+                  "time_in_top10_ms": {
+                    "$cond": [
+                      "$entered_top10_at",
+                      {
+                        "$subtract": ["$$NOW", "$entered_top10_at"]
+                      },
+                      0
+                    ]
+                  },
+                  "time_in_top10_days": {
+                    "$cond": [
+                      "$entered_top10_at",
+                      {
+                        "$divide": [
+                          {
+                            "$subtract": ["$$NOW", "$entered_top10_at"]
+                          },
+                          86400000
+                        ]
+                      },
+                      0
+                    ]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "left_top10_since": {
+                    "$cond": [
+                      {
+                        "$gt": ["$current_rank", 10]
+                      },
+                      "$$NOW",
+                      null
+                    ]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "weeks_in_of_top10": {
+                    "$cond": [
+                      {
+                        "$lt": ["$current_rank", 10]
+                      },
+                      {
+                        "$floor": {
+                          "$divide": [
+                            {
+                              "$subtract": ["$$NOW", "$left_top10_since"]
+                            },
+                            604800000
+                          ]
+                        }
+                      },
+                      0
+                    ]
+                  }
+                }
+              },
+              {
+                "$set": {
+                  "status": "active",
+                  "became_elite_date": "$$NOW"
+                }
+              },
+              {
+                "$match": {
+                  "$expr": {
+                    "$and": [
+                      {
+                        "$ne": ["$user_id", null]
+                      },
+                      {
+                        "$ne": ["$current_streak", null]
+                      },
+                      {
+                        "$ne": ["$last_rank", null]
+                      },
+                      {
+                        "$ne": ["$last_reset_time", null]
+                      },
+                      {
+                        "$ne": ["$leaderboard_score", null]
+                      },
+                      {
+                        "$ne": ["$longest_streak", null]
+                      },
+                      {
+                        "$ne": ["$rank", null]
+                      },
+                      {
+                        "$ne": ["$score", null]
+                      },
+                      {
+                        "$ne": ["$top10_history.entered_top10_at", null]
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "$addFields": {
+                  "elite_benefits": {
+                    "exclusive_content": true,
+                    "priority_support": true,
+                    "discounts": true
+                  },
+                  "is_elite_partner": true,
+                  "eligible_for_elite": true,
+                  "status": "active",
+                  "revocation_reason": null,
+                  "revocation_date": null,
+                  "last_verification_date": "$$NOW"
+                }
+              },
+              {
                 "$merge": {
-                  "into": "elite_partners",
+                  "into": "collection_elite_partner",
                   "on": "user_id",
                   "whenMatched": "merge",
                   "whenNotMatched": "insert"
